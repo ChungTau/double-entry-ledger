@@ -11,6 +11,10 @@ spring:
     ansi:
       enabled: always
 
+grpc:
+  server:
+    port: 9098
+
 debug: false
 logging:
   level:
