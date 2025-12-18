@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package com.chungtau.ledger.v1;
+
+option java_multiple_files = true;
+option java_package = "com.chungtau.ledger.grpc.v1";
+option java_outer_classname = "LedgerProto";
+
+service LedgerService {
+  rpc CreateTransaction (CreateTransactionRequest) returns (TransactionResponse);
+  
+  rpc GetBalance (GetBalanceRequest) returns (BalanceResponse);
+}
+
+message CreateTransactionRequest {
+  string idempotency_key = 1;
+  string from_account_id = 2;
+  string to_account_id = 3;
+  string amount = 4;
+  string currency = 5;
+  string description = 6;
+}
+
+message TransactionResponse {
+  string transaction_id = 1;
+  string status = 2;
+  string created_at = 3;
+}
+
+message GetBalanceRequest {
+  string account_id = 1;
+}
+
+message BalanceResponse {
+  string account_id = 1;
+  string currency = 2;
+  string balance = 3;
+  int64 version = 4;
+}
