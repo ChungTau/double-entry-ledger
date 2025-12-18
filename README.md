@@ -18,8 +18,8 @@ This system allows for the secure processing of financial transactions using the
 
 | Category | Technology | Usage |
 | :--- | :--- | :--- |
-| **Languages** | **Java 21 (LTS)** | Core Ledger (Virtual Threads, Decimal precision) |
-| | **Go (Golang)** | API Gateway, Audit Consumers |
+| **Languages** | **Java 21 (Spring Boot 3)** | Core Ledger (Virtual Threads, Decimal precision) |
+| | **Go (Gin Framework)** | API Gateway, Audit Consumers |
 | **Communication** | **gRPC** | Internal high-performance service-to-service calls |
 | | **Kafka** | Asynchronous Event Streaming |
 | **Storage** | **PostgreSQL** | Primary Relational DB (ACID Compliance) |
@@ -72,8 +72,8 @@ graph TD
 
         %% Application Layer
         subgraph "Microservices"
-            Gateway("API Gateway <br/> (Go)"):::go
-            LedgerSvc("Core Ledger Service <br/> (Java)"):::java
+            Gateway("API Gateway <br/> (Go + Gin)"):::go
+            LedgerSvc("Core Ledger Service <br/> (Spring Boot 3)"):::java
             AuditSvc("Audit Consumer <br/> (Go)"):::go
         end
 
@@ -124,14 +124,14 @@ This diagram details the life-cycle of a transfer request, highlighting the **Id
 
 ```mermaid
 sequenceDiagram
-    %% Apply Neutral Theme
-    %%{init: {'theme': 'neutral'}}%%
+    %% Apply Neutral Theme for visibility in Dark Mode
+    %%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '14px', 'fontFamily': 'arial'}}}%%
     
     autonumber
     actor User
-    participant GW as API Gateway (Go)
+    participant GW as API Gateway (Go + Gin)
     participant Redis
-    participant Ledger as Ledger Core (Java)
+    participant Ledger as Ledger Core (Spring Boot)
     participant DB as Postgres
     participant Kafka
 
@@ -146,8 +146,7 @@ sequenceDiagram
         GW->>Ledger: gRPC CreateTransaction()
         
         %% Step 3: ACID Transaction Start
-        %% 使用更柔和的淺灰色背景標示 Transaction 範圍
-        rect rgb(240, 240, 240)
+        rect rgb(230, 240, 255)
             note right of Ledger: Start DB Transaction (ACID)
             Ledger->>DB: BEGIN TRANSACTION
             
