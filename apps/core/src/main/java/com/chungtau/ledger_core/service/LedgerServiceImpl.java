@@ -23,22 +23,50 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
      */
     @Override
     public void createTransaction(CreateTransactionRequest request, StreamObserver<TransactionResponse> responseObserver) {
-        log.info("Processing transaction: from {} to {} with amount {}", 
-                request.getFromAccountId(), request.getToAccountId(), request.getAmount());
+        try {
+            // Validate required fields
+            if (request.getFromAccountId() == null || request.getFromAccountId().isEmpty()) {
+                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                    .withDescription("fromAccountId is required")
+                    .asRuntimeException());
+                return;
+            }
+            if (request.getToAccountId() == null || request.getToAccountId().isEmpty()) {
+                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                    .withDescription("toAccountId is required")
+                    .asRuntimeException());
+                return;
+            }
+            if (request.getAmount() == null || request.getAmount().isEmpty()) {
+                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                    .withDescription("amount is required")
+                    .asRuntimeException());
+                return;
+            }
 
-        // TODO: Implement idempotency check using Redis
-        // TODO: Implement double-entry business logic and ACID persistence via JPA
-        // TODO: Publish event to Kafka upon successful commit
-        
-        // Mock successful response
-        TransactionResponse response = TransactionResponse.newBuilder()
-                .setTransactionId(UUID.randomUUID().toString())
-                .setStatus("POSTED")
-                .setCreatedAt(Instant.now().toString())
-                .build();
+            log.info("Processing transaction: from [MASKED] to [MASKED] with amount [MASKED]");
+            log.debug("Transaction details - fromAccountId: {}, toAccountId: {}, amount: {}",
+                    request.getFromAccountId(), request.getToAccountId(), request.getAmount());
 
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+            // TODO: Implement idempotency check using Redis
+            // TODO: Implement double-entry business logic and ACID persistence via JPA
+            // TODO: Publish event to Kafka upon successful commit
+
+            // Mock successful response
+            TransactionResponse response = TransactionResponse.newBuilder()
+                    .setTransactionId(UUID.randomUUID().toString())
+                    .setStatus("POSTED")
+                    .setCreatedAt(Instant.now().toString())
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("Error processing transaction", e);
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                .withDescription("Failed to process transaction: " + e.getMessage())
+                .asRuntimeException());
+        }
     }
 
     /**
@@ -46,17 +74,33 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
      */
     @Override
     public void getBalance(GetBalanceRequest request, StreamObserver<BalanceResponse> responseObserver) {
-        log.info("Fetching balance for account: {}", request.getAccountId());
+        try {
+            // Validate required fields
+            if (request.getAccountId() == null || request.getAccountId().isEmpty()) {
+                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                    .withDescription("accountId is required")
+                    .asRuntimeException());
+                return;
+            }
 
-        // Mock balance response
-        BalanceResponse response = BalanceResponse.newBuilder()
-                .setAccountId(request.getAccountId())
-                .setCurrency("HKD")
-                .setBalance("1000.00")
-                .setVersion(1L) // Version is used for Optimistic Locking
-                .build();
+            log.info("Fetching balance for account: [MASKED]");
+            log.debug("Balance request for accountId: {}", request.getAccountId());
 
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+            // Mock balance response
+            BalanceResponse response = BalanceResponse.newBuilder()
+                    .setAccountId(request.getAccountId())
+                    .setCurrency("HKD")
+                    .setBalance("1000.00")
+                    .setVersion(1L) // Version is used for Optimistic Locking
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("Error fetching balance", e);
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                .withDescription("Failed to fetch balance: " + e.getMessage())
+                .asRuntimeException());
+        }
     }
 }
