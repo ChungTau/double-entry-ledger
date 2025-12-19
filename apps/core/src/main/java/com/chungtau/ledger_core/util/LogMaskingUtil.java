@@ -12,16 +12,16 @@ public final class LogMaskingUtil {
 
     /**
      * Masks sensitive string data for logging purposes.
-     * Shows only first 4 and last 4 characters for strings longer than 8 chars.
+     * PCI-DSS compliant: shows only last 4 characters.
      *
      * @param value the sensitive value to mask
-     * @return masked string with middle characters replaced by asterisks
+     * @return masked string showing only last 4 characters
      */
     public static String mask(String value) {
-        if (value == null || value.length() <= 8) {
+        if (value == null || value.length() < 4) {
             return "****";
         }
-        return value.substring(0, 4) + "****" + value.substring(value.length() - 4);
+        return "****" + value.substring(value.length() - 4);
     }
 
     /**

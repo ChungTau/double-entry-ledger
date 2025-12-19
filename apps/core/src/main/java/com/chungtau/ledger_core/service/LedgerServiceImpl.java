@@ -86,10 +86,11 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
             UUID secondLock = fromAccountId.compareTo(toAccountId) < 0 ? toAccountId : fromAccountId;
 
             // 4. Fetch accounts with Pessimistic Lock (prevents Race Condition)
-            Account account1 = accountRepository.findWithLockById(firstLock)
-                    .orElseThrow(() -> new IllegalArgumentException("Source account not found"));
-            Account account2 = accountRepository.findWithLockById(secondLock)
-                    .orElseThrow(() -> new IllegalArgumentException("Destination account not found"));
+            Account account1 = accountRepository.findById(firstLock)
+                    .orElseThrow(() -> new IllegalArgumentException("Account not found: " + firstLock));
+            
+            Account account2 = accountRepository.findById(secondLock)
+                    .orElseThrow(() -> new IllegalArgumentException("Account not found: " + secondLock));
 
             Account fromAccount = fromAccountId.equals(firstLock) ? account1 : account2;
             Account toAccount = toAccountId.equals(firstLock) ? account1 : account2;
@@ -130,10 +131,14 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
             log.info("Transaction processed successfully. ID: {}", transaction.getId());
 
             // 7. Construct Response
+            String createdAt = transaction.getBookedAt() != null ? 
+                               transaction.getBookedAt().toString() : 
+                               Instant.now().toString();
+
             TransactionResponse response = TransactionResponse.newBuilder()
                     .setTransactionId(transaction.getId().toString())
                     .setStatus(transaction.getStatus().toString())
-                    .setCreatedAt(Instant.now().toString()) 
+                    .setCreatedAt(createdAt) 
                     .build();
 
             responseObserver.onNext(response);

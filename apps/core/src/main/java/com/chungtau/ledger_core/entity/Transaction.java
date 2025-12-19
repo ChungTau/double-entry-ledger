@@ -64,8 +64,20 @@ public class Transaction {
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<TransactionEntry> entries;
 
-    public static Transaction createTransfer(String idempotencyKey, String referenceId, 
+    public static Transaction createTransfer(String idempotencyKey, String referenceId,
         Account fromAccount, Account toAccount, BigDecimal amount) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("idempotencyKey cannot be null or blank");
+        }
+        if (fromAccount == null) {
+            throw new IllegalArgumentException("fromAccount cannot be null");
+        }
+        if (toAccount == null) {
+            throw new IllegalArgumentException("toAccount cannot be null");
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("amount must be positive");
+        }
 
         Transaction tx = Transaction.builder()
         .idempotencyKey(idempotencyKey)
