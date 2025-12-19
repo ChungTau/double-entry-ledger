@@ -1,4 +1,23 @@
 spring:
+  application:
+    name: ledger-core
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ledger_db
+    username: user
+    password: password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        "[format_sql]": true
+
   docker:
     compose:
       lifecycle-management: start-only
