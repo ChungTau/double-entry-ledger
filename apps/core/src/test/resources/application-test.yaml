@@ -19,8 +19,8 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-        show_sql: true
+        "[format_sql]": true
+        "[show_sql]": true
     show-sql: true
 
   # Disable Spring Boot Docker Compose auto-start
@@ -45,6 +45,6 @@ server:
 # Test logging levels
 logging:
   level:
-    com.chungtau.ledger_core: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    "[com.chungtau.ledger_core]": DEBUG
+    "[org.hibernate.SQL]": DEBUG
+    "[org.hibernate.type.descriptor.sql.BasicBinder]": TRACE
