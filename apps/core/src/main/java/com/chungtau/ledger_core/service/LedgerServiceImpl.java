@@ -132,7 +132,7 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
                 toAccount,
                 amount
             );
-            transactionRepository.save(transaction);
+            transactionRepository.saveAndFlush(transaction);
 
             log.info("Transaction processed successfully. ID: {}", LogMaskingUtil.maskUuid(transaction.getId().toString()));
 
@@ -156,7 +156,6 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
                     .withDescription(e.getMessage())
                     .asRuntimeException());
         } catch (AccountNotFoundException e) {
-            log.warn("Account not found during transaction");
             responseObserver.onError(Status.NOT_FOUND
                     .withDescription(e.getMessage())
                     .asRuntimeException());
