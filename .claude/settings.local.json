@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(mvn test)",
+      "Bash(cat:*)",
+      "Bash(mvn clean test:*)",
+      "Bash(mvn test:*)",
+      "Bash(find:*)",
+      "Bash(for:*)",
+      "Bash(do mv \"$f\" \"$f.bak\")",
+      "Bash(done)",
+      "Bash(do mv \"$f\" \"$f%.bak\")",
+      "Bash(mvn dependency:tree:*)",
+      "Bash(mvn test-compile:*)"
+    ]
+  }
+}
