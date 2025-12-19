@@ -74,18 +74,33 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
      */
     @Override
     public void getBalance(GetBalanceRequest request, StreamObserver<BalanceResponse> responseObserver) {
-        log.info("Fetching balance for account: [MASKED]");
-        log.debug("Balance request for accountId: {}", request.getAccountId());
+        try {
+            // Validate required fields
+            if (request.getAccountId() == null || request.getAccountId().isEmpty()) {
+                responseObserver.onError(io.grpc.Status.INVALID_ARGUMENT
+                    .withDescription("accountId is required")
+                    .asRuntimeException());
+                return;
+            }
 
-        // Mock balance response
-        BalanceResponse response = BalanceResponse.newBuilder()
-                .setAccountId(request.getAccountId())
-                .setCurrency("HKD")
-                .setBalance("1000.00")
-                .setVersion(1L) // Version is used for Optimistic Locking
-                .build();
+            log.info("Fetching balance for account: [MASKED]");
+            log.debug("Balance request for accountId: {}", request.getAccountId());
 
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+            // Mock balance response
+            BalanceResponse response = BalanceResponse.newBuilder()
+                    .setAccountId(request.getAccountId())
+                    .setCurrency("HKD")
+                    .setBalance("1000.00")
+                    .setVersion(1L) // Version is used for Optimistic Locking
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("Error fetching balance", e);
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                .withDescription("Failed to fetch balance: " + e.getMessage())
+                .asRuntimeException());
+        }
     }
 }
