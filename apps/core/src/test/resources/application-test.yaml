@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: ledger-core-test
+
+  # Use real PostgreSQL (Docker or Testcontainers)
+  # Note: @ServiceConnection will override this when using Testcontainers
+  # But keeping this config provides flexibility for local testing
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ledger_test_db
+    username: user
+    password: password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: update  # Keep consistent with production
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        show_sql: true
+    show-sql: true
+
+  # Disable Spring Boot Docker Compose auto-start
+  docker:
+    compose:
+      enabled: false
+
+  # Redis config (kept for flexibility, mock in tests using @MockBean)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# gRPC test port (use random port to avoid conflicts)
+grpc:
+  server:
+    port: 0  # Random port to prevent port collision in CI
+
+server:
+  port: 0  # Random port
+
+# Test logging levels
+logging:
+  level:
+    com.chungtau.ledger_core: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
