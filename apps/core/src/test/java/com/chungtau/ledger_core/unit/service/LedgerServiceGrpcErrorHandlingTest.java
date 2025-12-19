@@ -394,7 +394,8 @@ class LedgerServiceGrpcErrorHandlingTest {
             // depends on UUID comparison. We need to handle both orders.
             when(transactionRepository.existsByIdempotencyKey(any())).thenReturn(false);
             // Set both findById calls to handle lock ordering
-            when(accountRepository.findById(fromAccountId)).thenReturn(Optional.of(fromAccount));
+            // Use lenient() because only one will be called depending on lock order
+            lenient().when(accountRepository.findById(fromAccountId)).thenReturn(Optional.of(fromAccount));
             when(accountRepository.findById(toAccountId)).thenReturn(Optional.empty());  // Not found
 
             CreateTransactionRequest request = CreateTransactionRequest.newBuilder()

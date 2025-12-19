@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -356,13 +357,27 @@ class LedgerServiceImplTest {
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
 
-        // Verify both accounts were saved (fromAccount and toAccount)
-        verify(accountRepository, times(2)).save(any(Account.class));
+        // Verify both accounts were saved with correct balances
+        ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
+        verify(accountRepository, times(2)).save(accountCaptor.capture());
 
-        // Verify fromAccount balance is now 0.00
-        assertThat(fromAccount.getBalance()).isEqualByComparingTo(new BigDecimal("0.00"));
-        // Verify toAccount balance is now 600.00
-        assertThat(toAccount.getBalance()).isEqualByComparingTo(new BigDecimal("600.00"));
+        List<Account> savedAccounts = accountCaptor.getAllValues();
+        assertThat(savedAccounts).hasSize(2);
+
+        // Find fromAccount and toAccount in saved accounts
+        Account savedFromAccount = savedAccounts.stream()
+                .filter(acc -> acc.getId().equals(fromAccountId))
+                .findFirst()
+                .orElseThrow();
+        Account savedToAccount = savedAccounts.stream()
+                .filter(acc -> acc.getId().equals(toAccountId))
+                .findFirst()
+                .orElseThrow();
+
+        // Verify fromAccount balance decreased to 0.00 (100.00 - 100.00)
+        assertThat(savedFromAccount.getBalance()).isEqualByComparingTo(new BigDecimal("0.00"));
+        // Verify toAccount balance increased to 600.00 (500.00 + 100.00)
+        assertThat(savedToAccount.getBalance()).isEqualByComparingTo(new BigDecimal("600.00"));
     }
 
     @Test
@@ -455,8 +470,26 @@ class LedgerServiceImplTest {
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
 
-        // Verify balances updated correctly
-        assertThat(fromAccount.getBalance()).isEqualByComparingTo(new BigDecimal("900.00"));
-        assertThat(toAccount.getBalance()).isEqualByComparingTo(new BigDecimal("600.00"));
+        // Verify both accounts were saved with correct balances
+        ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
+        verify(accountRepository, times(2)).save(accountCaptor.capture());
+
+        List<Account> savedAccounts = accountCaptor.getAllValues();
+        assertThat(savedAccounts).hasSize(2);
+
+        // Find fromAccount and toAccount in saved accounts
+        Account savedFromAccount = savedAccounts.stream()
+                .filter(acc -> acc.getId().equals(fromAccountId))
+                .findFirst()
+                .orElseThrow();
+        Account savedToAccount = savedAccounts.stream()
+                .filter(acc -> acc.getId().equals(toAccountId))
+                .findFirst()
+                .orElseThrow();
+
+        // Verify fromAccount balance decreased to 900.00 (1000.00 - 100.00)
+        assertThat(savedFromAccount.getBalance()).isEqualByComparingTo(new BigDecimal("900.00"));
+        // Verify toAccount balance increased to 600.00 (500.00 + 100.00)
+        assertThat(savedToAccount.getBalance()).isEqualByComparingTo(new BigDecimal("600.00"));
     }
 }
