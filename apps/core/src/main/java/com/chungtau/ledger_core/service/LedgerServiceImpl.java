@@ -87,10 +87,16 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
 
             // 4. Fetch accounts with Pessimistic Lock (prevents Race Condition)
             Account account1 = accountRepository.findById(firstLock)
-                    .orElseThrow(() -> new IllegalArgumentException("Account not found: " + firstLock));
-            
+                    .orElseThrow(() -> {
+                        log.warn("Account not found: {}", LogMaskingUtil.maskUuid(firstLock.toString()));
+                        return new AccountNotFoundException("Account not found");
+                    });
+
             Account account2 = accountRepository.findById(secondLock)
-                    .orElseThrow(() -> new IllegalArgumentException("Account not found: " + secondLock));
+                    .orElseThrow(() -> {
+                        log.warn("Account not found: {}", LogMaskingUtil.maskUuid(secondLock.toString()));
+                        return new AccountNotFoundException("Account not found");
+                    });
 
             Account fromAccount = fromAccountId.equals(firstLock) ? account1 : account2;
             Account toAccount = toAccountId.equals(firstLock) ? account1 : account2;
@@ -128,7 +134,7 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
             );
             transactionRepository.save(transaction);
 
-            log.info("Transaction processed successfully. ID: {}", transaction.getId());
+            log.info("Transaction processed successfully. ID: {}", LogMaskingUtil.maskUuid(transaction.getId().toString()));
 
             // 7. Construct Response
             String createdAt = transaction.getBookedAt() != null ? 
@@ -147,6 +153,11 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
         } catch (IllegalArgumentException e) {
             log.error("Validation failed for transaction: {}", e.getMessage());
             responseObserver.onError(Status.INVALID_ARGUMENT
+                    .withDescription(e.getMessage())
+                    .asRuntimeException());
+        } catch (AccountNotFoundException e) {
+            log.warn("Account not found during transaction");
+            responseObserver.onError(Status.NOT_FOUND
                     .withDescription(e.getMessage())
                     .asRuntimeException());
         } catch (Exception e) {
