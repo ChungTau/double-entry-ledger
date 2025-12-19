@@ -15,7 +15,12 @@
       "Bash(done)",
       "Bash(do mv \"$f\" \"$f%.bak\")",
       "Bash(mvn dependency:tree:*)",
-      "Bash(mvn test-compile:*)"
+      "Bash(mvn test-compile:*)",
+      "Bash(findstr:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(timeout 10 tail:*)",
+      "Bash(exit 0)"
     ]
   }
 }
