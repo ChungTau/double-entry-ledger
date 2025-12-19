@@ -1,6 +1,8 @@
 package com.chungtau.ledger_core.entity;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,8 +23,8 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
@@ -31,7 +33,7 @@ import lombok.ToString;
 @Table(name = "transactions", indexes = {
     @Index(name = "idx_reference_id", columnList = "reference_id")
 })
-@Data
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -61,4 +63,36 @@ public class Transaction {
 
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<TransactionEntry> entries;
+
+    public static Transaction createTransfer(String idempotencyKey, String referenceId, 
+        Account fromAccount, Account toAccount, BigDecimal amount) {
+
+        Transaction tx = Transaction.builder()
+        .idempotencyKey(idempotencyKey)
+        .referenceId(referenceId)
+        .status(TransactionStatus.POSTED)
+        .build();
+
+        List<TransactionEntry> entryList = new ArrayList<>();
+
+        // Debit
+        entryList.add(TransactionEntry.builder()
+        .transaction(tx)
+        .account(fromAccount)
+        .amount(amount)
+        .direction(EntryDirection.DEBIT)
+        .build());
+
+        // Credit
+        entryList.add(TransactionEntry.builder()
+        .transaction(tx)
+        .account(toAccount)
+        .amount(amount)
+        .direction(EntryDirection.CREDIT)
+        .build());
+
+        tx.entries = entryList;
+
+        return tx;
+    }
 }
