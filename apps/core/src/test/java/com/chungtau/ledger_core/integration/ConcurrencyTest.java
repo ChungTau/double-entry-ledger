@@ -1,9 +1,13 @@
 package com.chungtau.ledger_core.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -13,6 +17,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.chungtau.ledger.grpc.v1.CreateTransactionRequest;
 import com.chungtau.ledger.grpc.v1.TransactionResponse;
@@ -35,6 +42,9 @@ class ConcurrencyTest {
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @MockitoBean
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
     private UUID accountIdA;
     private UUID accountIdB;
 
@@ -43,13 +53,18 @@ class ConcurrencyTest {
         transactionRepository.deleteAll();
         accountRepository.deleteAll();
 
+        // Mock KafkaTemplate to return a completed future (prevents NullPointerException in OutboxEventPublisher)
+        // This is necessary because OutboxEventPublisherService tries to publish events in the background
+        CompletableFuture<SendResult<String, Object>> mockFuture = CompletableFuture.completedFuture(null);
+        lenient().when(kafkaTemplate.send(anyString(), anyString(), any())).thenReturn(mockFuture);
+
         // Initialize two accounts with sufficient funds.
-        // Both accounts need funds to ensure the bidirectional deadlock test 
+        // Both accounts need funds to ensure the bidirectional deadlock test
         // (A->B and B->A) doesn't fail with "Insufficient Funds".
         Account accountA = Account.builder()
                 .userId("user-a")
                 .currency("HKD")
-                .balance(new BigDecimal("1000.0000")) 
+                .balance(new BigDecimal("1000.0000"))
                 .build();
 
         Account accountB = Account.builder()

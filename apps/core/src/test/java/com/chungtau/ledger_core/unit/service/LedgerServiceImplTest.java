@@ -2,6 +2,8 @@ package com.chungtau.ledger_core.unit.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -19,15 +21,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import com.chungtau.ledger.grpc.v1.CreateTransactionRequest;
 import com.chungtau.ledger.grpc.v1.TransactionResponse;
+import com.chungtau.ledger.grpc.v1.TransactionCreatedEvent;
 import com.chungtau.ledger_core.entity.Account;
+import com.chungtau.ledger_core.entity.OutboxEvent;
 import com.chungtau.ledger_core.entity.Transaction;
 import com.chungtau.ledger_core.fixtures.TestDataBuilder;
 import com.chungtau.ledger_core.repository.AccountRepository;
 import com.chungtau.ledger_core.repository.TransactionRepository;
 import com.chungtau.ledger_core.service.LedgerServiceImpl;
+import com.chungtau.ledger_core.service.OutboxEventService;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -44,6 +48,9 @@ class LedgerServiceImplTest {
 
     @Mock
     private StreamObserver<TransactionResponse> responseObserver;
+
+    @Mock
+    private OutboxEventService outboxEventService;
 
     @InjectMocks
     private LedgerServiceImpl ledgerService;
@@ -356,6 +363,14 @@ class LedgerServiceImplTest {
         // Then: Should succeed
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
+        // Verify outbox event was created instead of direct Kafka send
+        verify(outboxEventService, times(1)).createOutboxEvent(
+            anyString(),  // aggregateId (transaction ID)
+            eq("TRANSACTION"),
+            eq("TRANSACTION_CREATED"),
+            any(TransactionCreatedEvent.class),
+            eq("transaction-events")
+        );
 
         // Verify both accounts were saved with correct balances
         ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
@@ -469,6 +484,14 @@ class LedgerServiceImplTest {
         // Then: Should succeed
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
+        // Verify outbox event was created instead of direct Kafka send
+        verify(outboxEventService, times(1)).createOutboxEvent(
+            anyString(),  // aggregateId (transaction ID)
+            eq("TRANSACTION"),
+            eq("TRANSACTION_CREATED"),
+            any(TransactionCreatedEvent.class),
+            eq("transaction-events")
+        );
 
         // Verify both accounts were saved with correct balances
         ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
