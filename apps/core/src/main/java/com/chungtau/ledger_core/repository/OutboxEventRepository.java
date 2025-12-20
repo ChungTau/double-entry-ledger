@@ -40,8 +40,11 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
     @Query("SELECT COUNT(e) FROM OutboxEvent e WHERE e.status IN ('PENDING', 'PROCESSING')")
     long countPendingEvents();
 
-    // Query failed events for alerting
+    // Query events by status
     List<OutboxEvent> findByStatus(OutboxEventStatus status);
+
+    // Count events by status for metrics
+    long countByStatus(OutboxEventStatus status);
 
     // Optional: cleanup old published events
     @Modifying

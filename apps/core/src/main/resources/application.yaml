@@ -54,6 +54,8 @@ outbox:
       multiplier: 2.0            # Exponential backoff multiplier
       max-retries: 5             # Maximum retry attempts
       jitter-ms: 1000            # Random jitter range (0-1000ms)
+  metrics:
+    update-interval-ms: 10000  # Update Prometheus metrics every 10 seconds
 
 grpc:
   server:
@@ -63,3 +65,4 @@ debug: false
 logging:
   level:
     "[org.springframework.boot.autoconfigure]": INFO
+    "[org.hibernate.SQL]": INFO  # Reduce SQL query logging (use DEBUG for development)

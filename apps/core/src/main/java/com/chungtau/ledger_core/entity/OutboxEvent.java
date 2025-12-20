@@ -21,9 +21,9 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "outbox_events", indexes = {
-    @Index(name = "idx_status_created", columnList = "status, createdAt"),
-    @Index(name = "idx_next_retry", columnList = "nextRetryAt"),
-    @Index(name = "idx_aggregate", columnList = "aggregateType, aggregateId")
+    @Index(name = "idx_status_created", columnList = "status, created_at"),
+    @Index(name = "idx_next_retry", columnList = "next_retry_at"),
+    @Index(name = "idx_aggregate", columnList = "aggregate_type, aggregate_id")
 })
 @Data
 @NoArgsConstructor
@@ -35,23 +35,23 @@ public class OutboxEvent {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(name = "aggregate_id", nullable = false)
     private String aggregateId;   // e.g., Transaction ID
 
-    @Column(nullable = false)
+    @Column(name = "aggregate_type", nullable = false)
     private String aggregateType; // e.g., "TRANSACTION"
 
-    @Column(nullable = false)
+    @Column(name = "type", nullable = false)
     private String type;          // e.g., "TRANSACTION_CREATED"
 
-    @Column(nullable = false, columnDefinition = "TEXT") // Postgres JSONB or TEXT
+    @Column(name = "payload", nullable = false, columnDefinition = "TEXT") // Postgres JSONB or TEXT
     private String payload;       // JSON string of the event
 
-    @Column(nullable = false)
+    @Column(name = "topic", nullable = false)
     private String topic;         // Kafka Topic
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false)
     @Builder.Default
     private OutboxEventStatus status = OutboxEventStatus.PENDING;
 
@@ -76,6 +76,6 @@ public class OutboxEvent {
     private String lastError;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 }
