@@ -37,3 +37,15 @@ message BalanceResponse {
   string balance = 3;
   int64 version = 4;
 }
+
+// Domain Events for Kafka/Event-Driven Architecture
+message TransactionCreatedEvent {
+  string transaction_id = 1;
+  string idempotency_key = 2;
+  string from_account_id = 3;
+  string to_account_id = 4;
+  string amount = 5;
+  string currency = 6;
+  string status = 7;
+  string booked_at = 8;  // ISO 8601 timestamp
+}

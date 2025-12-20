@@ -13,7 +13,7 @@ import com.chungtau.ledger.grpc.v1.LedgerServiceGrpc;
 import com.chungtau.ledger.grpc.v1.TransactionResponse;
 import com.chungtau.ledger_core.entity.Account;
 import com.chungtau.ledger_core.entity.Transaction;
-import com.chungtau.ledger_core.event.TransactionCreatedEvent;
+import com.chungtau.ledger.grpc.v1.TransactionCreatedEvent;
 import com.chungtau.ledger_core.exception.AccountNotFoundException;
 import com.chungtau.ledger_core.repository.AccountRepository;
 import com.chungtau.ledger_core.repository.TransactionRepository;
@@ -143,15 +143,15 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
                                transaction.getBookedAt().toString() : 
                                Instant.now().toString();
 
-            TransactionCreatedEvent event = TransactionCreatedEvent.builder()
-                    .transactionId(transaction.getId().toString())
-                    .idempotencyKey(transaction.getIdempotencyKey())
-                    .fromAccountId(fromAccount.getId().toString())
-                    .toAccountId(toAccount.getId().toString())
-                    .amount(amount)
-                    .currency(request.getCurrency())
-                    .status(transaction.getStatus().toString())
-                    .bookedAt(createdAt)
+            TransactionCreatedEvent event = TransactionCreatedEvent.newBuilder()
+                    .setTransactionId(transaction.getId().toString())
+                    .setIdempotencyKey(transaction.getIdempotencyKey())
+                    .setFromAccountId(fromAccount.getId().toString())
+                    .setToAccountId(toAccount.getId().toString())
+                    .setAmount(amount.toString())
+                    .setCurrency(request.getCurrency())
+                    .setStatus(transaction.getStatus().toString())
+                    .setBookedAt(createdAt)
                     .build();
 
             // Save to outbox within the same transaction

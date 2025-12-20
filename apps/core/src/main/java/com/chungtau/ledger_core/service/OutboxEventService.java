@@ -16,6 +16,8 @@ import com.chungtau.ledger_core.entity.OutboxEventStatus;
 import com.chungtau.ledger_core.repository.OutboxEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,7 +60,14 @@ public class OutboxEventService {
             Object payload,
             String topic) {
         try {
-            String jsonPayload = objectMapper.writeValueAsString(payload);
+            String jsonPayload;
+
+            // Handle Protobuf messages differently from POJOs
+            if (payload instanceof Message) {
+                jsonPayload = JsonFormat.printer().print((Message) payload);
+            } else {
+                jsonPayload = objectMapper.writeValueAsString(payload);
+            }
 
             OutboxEvent event = OutboxEvent.builder()
                     .aggregateId(aggregateId)
@@ -80,6 +89,9 @@ public class OutboxEventService {
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event payload for {}", eventType, e);
             throw new IllegalArgumentException("Invalid event payload", e);
+        } catch (Exception e) {
+            log.error("Failed to serialize protobuf event payload for {}", eventType, e);
+            throw new IllegalArgumentException("Invalid protobuf payload", e);
         }
     }
 
