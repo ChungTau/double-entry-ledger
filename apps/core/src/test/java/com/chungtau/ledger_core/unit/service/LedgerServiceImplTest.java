@@ -25,7 +25,6 @@ import com.chungtau.ledger.grpc.v1.CreateTransactionRequest;
 import com.chungtau.ledger.grpc.v1.TransactionResponse;
 import com.chungtau.ledger.grpc.v1.TransactionCreatedEvent;
 import com.chungtau.ledger_core.entity.Account;
-import com.chungtau.ledger_core.entity.OutboxEvent;
 import com.chungtau.ledger_core.entity.Transaction;
 import com.chungtau.ledger_core.fixtures.TestDataBuilder;
 import com.chungtau.ledger_core.repository.AccountRepository;
