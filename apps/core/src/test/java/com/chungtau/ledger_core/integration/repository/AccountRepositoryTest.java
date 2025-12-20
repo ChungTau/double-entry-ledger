@@ -200,7 +200,7 @@ class AccountRepositoryTest extends AbstractRepositoryTest {
 
         // When: Update balance
         testAccount.setBalance(new BigDecimal("999.9999"));
-        Account updated = accountRepository.saveAndFlush(testAccount);
+        accountRepository.saveAndFlush(testAccount);
         entityManager.clear();
 
         // Then
