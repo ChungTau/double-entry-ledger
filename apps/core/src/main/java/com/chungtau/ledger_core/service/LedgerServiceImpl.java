@@ -13,6 +13,7 @@ import com.chungtau.ledger.grpc.v1.LedgerServiceGrpc;
 import com.chungtau.ledger.grpc.v1.TransactionResponse;
 import com.chungtau.ledger_core.entity.Account;
 import com.chungtau.ledger_core.entity.Transaction;
+import com.chungtau.ledger_core.event.TransactionCreatedEvent;
 import com.chungtau.ledger_core.exception.AccountNotFoundException;
 import com.chungtau.ledger_core.repository.AccountRepository;
 import com.chungtau.ledger_core.repository.TransactionRepository;
@@ -31,7 +32,9 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
+    private final OutboxEventService outboxEventService;
 
+    private static final String TOPIC_TRANSACTION_CREATED = "transaction-events";
     /**
      * Handles money transfer requests between accounts with full ACID compliance.
      * 
@@ -136,10 +139,34 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
 
             log.info("Transaction processed successfully. ID: {}", LogMaskingUtil.maskUuid(transaction.getId().toString()));
 
-            // 7. Construct Response
             String createdAt = transaction.getBookedAt() != null ? 
                                transaction.getBookedAt().toString() : 
                                Instant.now().toString();
+
+            TransactionCreatedEvent event = TransactionCreatedEvent.builder()
+                    .transactionId(transaction.getId().toString())
+                    .idempotencyKey(transaction.getIdempotencyKey())
+                    .fromAccountId(fromAccount.getId().toString())
+                    .toAccountId(toAccount.getId().toString())
+                    .amount(amount)
+                    .currency(request.getCurrency())
+                    .status(transaction.getStatus().toString())
+                    .bookedAt(createdAt)
+                    .build();
+
+            // Save to outbox within the same transaction
+            // aggregateId is used as Kafka message key to ensure event ordering per transaction
+            outboxEventService.createOutboxEvent(
+                    transaction.getId().toString(), // aggregateId (used as Kafka key)
+                    "TRANSACTION", // aggregateType
+                    "TRANSACTION_CREATED", // eventType
+                    event, // payload
+                    TOPIC_TRANSACTION_CREATED // topic
+            );
+
+            log.debug("Transaction event saved to outbox: {}", transaction.getId());
+
+            // 7. Construct Response
 
             TransactionResponse response = TransactionResponse.newBuilder()
                     .setTransactionId(transaction.getId().toString())

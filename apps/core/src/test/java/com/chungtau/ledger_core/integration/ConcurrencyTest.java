@@ -13,6 +13,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.chungtau.ledger.grpc.v1.CreateTransactionRequest;
 import com.chungtau.ledger.grpc.v1.TransactionResponse;
@@ -34,6 +36,9 @@ class ConcurrencyTest {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @MockitoBean
+    private KafkaTemplate<String, Object> kafkaTemplate;
 
     private UUID accountIdA;
     private UUID accountIdB;

@@ -30,6 +30,31 @@ spring:
     ansi:
       enabled: always
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        "[spring.json.add.type.headers]": false
+    template:
+      default-topic: transaction-events
+
+  task:
+    scheduling:
+      pool:
+        size: 2  # Dedicated thread pool for @Scheduled tasks
+
+outbox:
+  publisher:
+    poll-interval-ms: 1000     # Polling interval in milliseconds (checks every 1 second)
+    batch-size: 50              # Number of events to process per batch
+    retry:
+      initial-interval-ms: 1000  # Initial retry delay of 1 second
+      multiplier: 2.0            # Exponential backoff multiplier
+      max-retries: 5             # Maximum retry attempts
+      jitter-ms: 1000            # Random jitter range (0-1000ms)
+
 grpc:
   server:
     port: 9098
