@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -30,8 +29,7 @@ import com.chungtau.ledger_core.service.LedgerServiceImpl;
 
 import io.grpc.stub.StreamObserver;
 
-@SpringBootTest
-class ConcurrencyTest {
+class ConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private LedgerServiceImpl ledgerService;
