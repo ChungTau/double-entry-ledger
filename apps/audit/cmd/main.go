@@ -7,24 +7,49 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/chungtau/ledger-audit/internal/elasticsearch"
 	"github.com/chungtau/ledger-audit/internal/model"
 	"github.com/segmentio/kafka-go"
 )
+
+var esClient *elasticsearch.Client
 
 func main() {
 	brokerAddress := getEnv("KAFKA_BROKER", "localhost:9092")
 	topic := getEnv("KAFKA_TOPIC", "transaction-events")
 	groupID := "audit-service-group"
 
+	esURL := getEnv("ELASTICSEARCH_URL", "http://localhost:9200")
+	esIndex := getEnv("ELASTICSEARCH_INDEX", "transactions")
+
 	log.Printf("Starting Audit Service. Broker: %s, Topic: %s", brokerAddress, topic)
+	log.Printf("Elasticsearch: %s, Index: %s", esURL, esIndex)
+
+	// Initialize Elasticsearch client with retry
+	var err error
+	for i := 0; i < 10; i++ {
+		esClient, err = elasticsearch.NewClient(elasticsearch.Config{
+			URL:   esURL,
+			Index: esIndex,
+		})
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to connect to Elasticsearch (attempt %d/10): %v", i+1, err)
+		time.Sleep(5 * time.Second)
+	}
+	if err != nil {
+		log.Fatalf("Failed to initialize Elasticsearch client after 10 attempts: %v", err)
+	}
 
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  []string{brokerAddress},
 		Topic:    topic,
-		GroupID:  groupID, // Load Balancing
-		MinBytes: 1,       // 1 byte - consume messages immediately
-		MaxBytes: 10e6,    // 10MB
+		GroupID:  groupID,
+		MinBytes: 1,
+		MaxBytes: 10e6,
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -51,27 +76,53 @@ func main() {
 			continue
 		}
 
-		processMessage(m)
+		processMessage(ctx, m)
+	}
+
+	// Graceful shutdown: flush bulk indexer before closing
+	log.Println("Flushing Elasticsearch bulk indexer...")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+	if err := esClient.Close(shutdownCtx); err != nil {
+		log.Printf("Error closing Elasticsearch client: %v", err)
 	}
 
 	if err := r.Close(); err != nil {
-		log.Printf("failed to close reader: %v", err)
+		log.Printf("Failed to close reader: %v", err)
 	}
 	log.Println("Audit Service stopped gracefully.")
 }
 
-func processMessage(m kafka.Message) {
+func processMessage(ctx context.Context, m kafka.Message) {
 	log.Printf("Received Event | Key: %s | Partition: %d | Offset: %d", string(m.Key), m.Partition, m.Offset)
 
 	var event model.TransactionCreatedEvent
 	err := json.Unmarshal(m.Value, &event)
 	if err != nil {
-		log.Printf("❌ Failed to unmarshal JSON: %v. Raw: %s", err, string(m.Value))
+		log.Printf("ERROR: Failed to unmarshal JSON: %v. Raw: %s", err, string(m.Value))
 		return
 	}
 
-	log.Printf("✅ AUDIT LOG: Transaction [%s] created. Amount: %s %s. Status: %s",
+	// Existing logging functionality preserved
+	log.Printf("AUDIT LOG: Transaction [%s] created. Amount: %s %s. Status: %s",
 		event.TransactionID, event.Amount, event.Currency, event.Status)
+
+	// Index to Elasticsearch
+	doc := elasticsearch.TransactionDocument{
+		TransactionID:  event.TransactionID,
+		IdempotencyKey: event.IdempotencyKey,
+		FromAccountID:  event.FromAccountID,
+		ToAccountID:    event.ToAccountID,
+		AmountRaw:      event.Amount,
+		Currency:       event.Currency,
+		Status:         event.Status,
+		BookedAt:       event.BookedAt,
+	}
+
+	if err := esClient.IndexTransaction(ctx, doc, m.Value); err != nil {
+		// Error already logged in IndexTransaction with full payload
+		return
+	}
 }
 
 // Helper to read env vars
