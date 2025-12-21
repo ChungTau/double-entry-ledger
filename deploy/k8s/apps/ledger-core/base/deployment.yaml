@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-core
+  labels:
+    app: ledger-core
+    version: v1
+    app.kubernetes.io/name: ledger-core
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: double-entry-ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger-core
+  template:
+    metadata:
+      labels:
+        app: ledger-core
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+        - name: ledger-core
+          image: ledger-core:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 9098
+              protocol: TCP
+          env:
+            # Spring profile
+            - name: SPRING_PROFILES_ACTIVE
+              value: "kubernetes"
+            # Database connection via K8s DNS
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgresql:5432/ledger_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ledger-secrets
+                  key: postgres-username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ledger-secrets
+                  key: postgres-password
+            # Redis connection via K8s DNS
+            - name: SPRING_DATA_REDIS_HOST
+              value: "redis-master"
+            - name: SPRING_DATA_REDIS_PORT
+              value: "6379"
+            # Kafka connection via K8s DNS
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+          envFrom:
+            - configMapRef:
+                name: ledger-core-config
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+      terminationGracePeriodSeconds: 30

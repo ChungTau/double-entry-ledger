@@ -1,0 +1,86 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ledger-ingress
+  namespace: ledger-dev
+  labels:
+    app.kubernetes.io/name: ledger-ingress
+    app.kubernetes.io/part-of: double-entry-ledger
+  annotations:
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    # Rate limiting at ingress level (additional layer)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-Idempotency-Key"
+spec:
+  ingressClassName: nginx
+  rules:
+    # API Gateway endpoint
+    - host: api.ledger.local
+      http:
+        paths:
+          # All API requests go to gateway
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ledger-gateway
+                port:
+                  number: 8081
+
+---
+# Separate Ingress for observability tools (optional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ledger-observability-ingress
+  namespace: ledger-dev
+  labels:
+    app.kubernetes.io/name: ledger-observability-ingress
+    app.kubernetes.io/part-of: double-entry-ledger
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    # Kafka UI
+    - host: kafka.ledger.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kafka-ui
+                port:
+                  number: 8080
+    # Kibana
+    - host: kibana.ledger.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kibana-kibana
+                port:
+                  number: 5601
+    # Prometheus (if enabled)
+    - host: prometheus.ledger.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-kube-prometheus-prometheus
+                port:
+                  number: 9090

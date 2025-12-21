@@ -1,0 +1,65 @@
+# Kibana Helm Values - Development Environment
+# Chart: https://helm.elastic.co - kibana
+# Install:
+#   helm repo add elastic https://helm.elastic.co
+#   helm install kibana elastic/kibana -f kibana-values.yaml -n ledger-dev
+
+image: "docker.elastic.co/kibana/kibana"
+imageTag: "8.11.3"
+imagePullPolicy: IfNotPresent
+
+# Single replica for dev
+replicas: 1
+
+# Elasticsearch connection
+elasticsearchHosts: "http://elasticsearch-master:9200"
+
+# Resource limits for Minikube
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Kibana configuration - security disabled for dev
+kibanaConfig:
+  kibana.yml: |
+    server.host: "0.0.0.0"
+    server.shutdownTimeout: "5s"
+    elasticsearch.hosts: ["http://elasticsearch-master:9200"]
+    monitoring.ui.container.elasticsearch.enabled: true
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 5601
+  httpPortName: http
+
+# Health checks
+healthCheckPath: "/app/kibana"
+
+readinessProbe:
+  failureThreshold: 3
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  successThreshold: 3
+  timeoutSeconds: 5
+
+# Pod Security Context
+securityContext:
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Lifecycle hooks
+lifecycle: {}
+
+# Node selector (optional)
+nodeSelector: {}
+
+# Tolerations (optional)
+tolerations: []
+
+# Pod antiaffinity (soft for single node)
+antiAffinity: "soft"

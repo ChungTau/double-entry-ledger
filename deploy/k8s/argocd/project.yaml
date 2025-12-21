@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ledger
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: double-entry-ledger
+spec:
+  description: Double-Entry Ledger Microservices Project
+
+  # Source repositories allowed for this project
+  sourceRepos:
+    - 'https://github.com/ChungTau/double-entry-ledger.git'
+    - 'oci://registry-1.docker.io/bitnamicharts'
+    - 'https://helm.elastic.co'
+    - 'https://prometheus-community.github.io/helm-charts'
+
+  # Destination clusters and namespaces
+  destinations:
+    - namespace: ledger-dev
+      server: https://kubernetes.default.svc
+    - namespace: ledger-staging
+      server: https://kubernetes.default.svc
+    - namespace: ledger-prod
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  # Allowed cluster-scoped resources
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: 'networking.k8s.io'
+      kind: IngressClass
+
+  # Allowed namespace-scoped resources
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Orphaned resource monitoring
+  orphanedResources:
+    warn: true
+
+  # Sync windows (optional - restrict prod deployments to business hours)
+  # Uncomment for production use
+  # syncWindows:
+  #   - kind: allow
+  #     schedule: '0 6-22 * * 1-5'  # Mon-Fri 6am-10pm
+  #     duration: 16h
+  #     applications:
+  #       - 'ledger-*-prod'
+  #     namespaces:
+  #       - ledger-prod

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-audit
+  labels:
+    app: ledger-audit
+    app.kubernetes.io/name: ledger-audit
+    app.kubernetes.io/component: audit-service
+    app.kubernetes.io/part-of: double-entry-ledger
+spec:
+  # Headless service - audit service is a Kafka consumer without inbound traffic
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: ledger-audit

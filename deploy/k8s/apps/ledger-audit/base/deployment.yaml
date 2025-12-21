@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-audit
+  labels:
+    app: ledger-audit
+    version: v1
+    app.kubernetes.io/name: ledger-audit
+    app.kubernetes.io/component: audit-service
+    app.kubernetes.io/part-of: double-entry-ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger-audit
+  template:
+    metadata:
+      labels:
+        app: ledger-audit
+        version: v1
+    spec:
+      containers:
+        - name: ledger-audit
+          image: ledger-audit:local
+          imagePullPolicy: Never
+          env:
+            # Kafka connection via K8s DNS
+            - name: KAFKA_BROKER
+              value: "kafka:9092"
+            - name: KAFKA_TOPIC
+              value: "transaction-events"
+            - name: KAFKA_DLQ_TOPIC
+              value: "transactions-dlq"
+            - name: KAFKA_GROUP_ID
+              value: "ledger-audit-consumer"
+            # Elasticsearch connection via K8s DNS
+            - name: ELASTICSEARCH_URL
+              value: "http://elasticsearch-master:9200"
+            - name: ELASTICSEARCH_INDEX
+              value: "transactions"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          # No HTTP endpoint, use exec probe to check process
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f audit-service || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+      # Allow time for Kafka consumer group rebalance during shutdown
+      terminationGracePeriodSeconds: 45

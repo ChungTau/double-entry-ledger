@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ledger-dev
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: dev
+
+# Patches for dev environment
+patches:
+  - target:
+      kind: Deployment
+      name: ledger-gateway
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DEV_MODE
+          value: "true"
