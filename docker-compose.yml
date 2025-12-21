@@ -71,6 +71,55 @@ services:
     networks:
       - ledger-net
 
+  # 5. Elasticsearch 8.x - Audit Log Storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: ledger-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - node.name=ledger-es-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - cluster.name=ledger-cluster
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - ledger-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -vq '\"status\":\"red\"'"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # 6. Kibana - Elasticsearch Visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.3
+    container_name: ledger-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=ledger-kibana
+      - XPACK_SECURITY_ENABLED=false
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - ledger-net
+
   audit-service:
     build:
       context: ./apps/audit
@@ -79,11 +128,35 @@ services:
     environment:
       KAFKA_BROKER: kafka:29092
       KAFKA_TOPIC: transaction-events
+      KAFKA_DLQ_TOPIC: transactions-dlq
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_INDEX: transactions
     depends_on:
       kafka:
         condition: service_started
+      elasticsearch:
+        condition: service_healthy
     networks:
       - ledger-net
+
+  # Kibana Index Pattern Auto-Configuration
+  kibana-init:
+    build:
+      context: ./deploy/docker/kibana-init
+      dockerfile: Dockerfile
+    container_name: ledger-kibana-init
+    environment:
+      KIBANA_URL: http://kibana:5601
+      MAX_RETRIES: 30
+      RETRY_INTERVAL: 10
+    depends_on:
+      kibana:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - ledger-net
+    restart: "no"
 
   # 5. Prometheus - Metrics Collection
   prometheus:
@@ -130,6 +203,7 @@ volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
+  elasticsearch_data:
 
 networks:
   ledger-net:
