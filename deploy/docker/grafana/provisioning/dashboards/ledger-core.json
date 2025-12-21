@@ -444,6 +444,12 @@
           "expr": "rate(outbox_events_failed_total{job=\"ledger-core\"}[1m])",
           "legendFormat": "Failed",
           "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "outbox_events{status=\"processing\", job=\"ledger-core\"}",
+          "legendFormat": "Processing",
+          "refId": "C"
         }
       ],
       "title": "Outbox Events Rate",
@@ -489,7 +495,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus" },
-          "expr": "outbox_events_pending{job=\"ledger-core\"}",
+          "expr": "outbox_events{status=\"pending\", job=\"ledger-core\"}",
           "refId": "A"
         }
       ],

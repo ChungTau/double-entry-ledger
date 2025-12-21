@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 
 import com.chungtau.ledger_core.entity.OutboxEvent;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,9 +23,24 @@ public class OutboxEventPublisherService {
 
     private final OutboxEventService outboxEventService; // Inject Service for DB operations
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final MeterRegistry meterRegistry;
+
+    private Counter publishedCounter;
+    private Counter failedCounter;
 
     @Value("${outbox.publisher.batch-size:50}")
     private int batchSize;
+
+    @PostConstruct
+    public void initMetrics() {
+        publishedCounter = Counter.builder("outbox.events.published")
+                .description("Total number of outbox events successfully published to Kafka")
+                .register(meterRegistry);
+
+        failedCounter = Counter.builder("outbox.events.failed")
+                .description("Total number of outbox events that failed to publish")
+                .register(meterRegistry);
+    }
 
     /**
      * Polls and publishes pending events from the outbox.
@@ -46,9 +64,11 @@ public class OutboxEventPublisherService {
 
                 // 3. Mark as PUBLISHED (via Service Proxy - new transaction)
                 outboxEventService.markAsPublished(event);
+                publishedCounter.increment();
             } catch (Exception e) {
                 // 4. Handle failure (via Service Proxy - new transaction)
                 outboxEventService.handlePublishFailure(event, e);
+                failedCounter.increment();
             }
         }
     }
