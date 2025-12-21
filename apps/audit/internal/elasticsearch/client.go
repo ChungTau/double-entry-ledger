@@ -10,21 +10,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chungtau/ledger-audit/internal/dlq"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 )
 
 // Client wraps the Elasticsearch client with audit-specific functionality
 type Client struct {
-	es      *elasticsearch.Client
-	indexer esutil.BulkIndexer
-	index   string
+	es          *elasticsearch.Client
+	indexer     esutil.BulkIndexer
+	index       string
+	dlqProducer *dlq.Producer
 }
 
 // Config holds Elasticsearch connection configuration
 type Config struct {
-	URL   string
-	Index string
+	URL         string
+	Index       string
+	DLQProducer *dlq.Producer
 }
 
 // TransactionDocument represents the document to be indexed
@@ -93,8 +96,9 @@ func NewClient(cfg Config) (*Client, error) {
 	log.Printf("Connected to Elasticsearch: %s", res.Status())
 
 	client := &Client{
-		es:    es,
-		index: cfg.Index,
+		es:          es,
+		index:       cfg.Index,
+		dlqProducer: cfg.DLQProducer,
 	}
 
 	// Ensure index exists with proper mapping
@@ -182,10 +186,34 @@ func (c *Client) IndexTransaction(ctx context.Context, doc TransactionDocument, 
 				log.Printf("Indexed transaction [%s] to Elasticsearch", doc.TransactionID)
 			},
 			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
+				var errorType, errorReason string
 				if err != nil {
+					errorType = "client_error"
+					errorReason = err.Error()
 					log.Printf("ERROR: Failed to index transaction [%s]: %v. Raw payload: %s", doc.TransactionID, err, string(rawJSON))
 				} else {
+					errorType = res.Error.Type
+					errorReason = res.Error.Reason
 					log.Printf("ERROR: Failed to index transaction [%s]: %s %s. Raw payload: %s", doc.TransactionID, res.Error.Type, res.Error.Reason, string(rawJSON))
+				}
+
+				// Send to DLQ if producer is configured
+				if c.dlqProducer != nil {
+					dlqDoc := dlq.FailedDocument{
+						OriginalDocument: rawJSON,
+						DocumentID:       doc.TransactionID,
+						ErrorType:        errorType,
+						ErrorReason:      errorReason,
+						FailedAt:         time.Now().UTC(),
+						RetryCount:       0,
+						SourceTopic:      "transaction-events",
+					}
+					// Use independent context to ensure DLQ write even if parent context is cancelled
+					timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					if dlqErr := c.dlqProducer.SendToDeadLetter(timeoutCtx, dlqDoc); dlqErr != nil {
+						log.Printf("ERROR: Failed to send to DLQ: %v. Original payload: %s", dlqErr, string(rawJSON))
+					}
 				}
 			},
 		},

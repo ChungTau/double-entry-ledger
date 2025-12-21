@@ -9,16 +9,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chungtau/ledger-audit/internal/dlq"
 	"github.com/chungtau/ledger-audit/internal/elasticsearch"
 	"github.com/chungtau/ledger-audit/internal/model"
 	"github.com/segmentio/kafka-go"
 )
 
 var esClient *elasticsearch.Client
+var dlqProducer *dlq.Producer
 
 func main() {
 	brokerAddress := getEnv("KAFKA_BROKER", "localhost:9092")
 	topic := getEnv("KAFKA_TOPIC", "transaction-events")
+	dlqTopic := getEnv("KAFKA_DLQ_TOPIC", "transactions-dlq")
 	groupID := "audit-service-group"
 
 	esURL := getEnv("ELASTICSEARCH_URL", "http://localhost:9200")
@@ -26,13 +29,18 @@ func main() {
 
 	log.Printf("Starting Audit Service. Broker: %s, Topic: %s", brokerAddress, topic)
 	log.Printf("Elasticsearch: %s, Index: %s", esURL, esIndex)
+	log.Printf("DLQ Topic: %s", dlqTopic)
+
+	// Initialize DLQ Producer
+	dlqProducer = dlq.NewProducer([]string{brokerAddress}, dlqTopic)
 
 	// Initialize Elasticsearch client with retry
 	var err error
 	for i := 0; i < 10; i++ {
 		esClient, err = elasticsearch.NewClient(elasticsearch.Config{
-			URL:   esURL,
-			Index: esIndex,
+			URL:         esURL,
+			Index:       esIndex,
+			DLQProducer: dlqProducer,
 		})
 		if err == nil {
 			break
@@ -90,6 +98,14 @@ func main() {
 	if err := r.Close(); err != nil {
 		log.Printf("Failed to close reader: %v", err)
 	}
+
+	// Close DLQ Producer
+	if dlqProducer != nil {
+		if err := dlqProducer.Close(); err != nil {
+			log.Printf("Failed to close DLQ producer: %v", err)
+		}
+	}
+
 	log.Println("Audit Service stopped gracefully.")
 }
 

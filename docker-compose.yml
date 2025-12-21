@@ -128,6 +128,7 @@ services:
     environment:
       KAFKA_BROKER: kafka:29092
       KAFKA_TOPIC: transaction-events
+      KAFKA_DLQ_TOPIC: transactions-dlq
       ELASTICSEARCH_URL: http://elasticsearch:9200
       ELASTICSEARCH_INDEX: transactions
     depends_on:
@@ -137,6 +138,25 @@ services:
         condition: service_healthy
     networks:
       - ledger-net
+
+  # Kibana Index Pattern Auto-Configuration
+  kibana-init:
+    build:
+      context: ./deploy/docker/kibana-init
+      dockerfile: Dockerfile
+    container_name: ledger-kibana-init
+    environment:
+      KIBANA_URL: http://kibana:5601
+      MAX_RETRIES: 30
+      RETRY_INTERVAL: 10
+    depends_on:
+      kibana:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - ledger-net
+    restart: "no"
 
   # 5. Prometheus - Metrics Collection
   prometheus:
