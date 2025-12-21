@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 5s  # Faster scrape for development/debugging
+  evaluation_interval: 5s
+
+scrape_configs:
+  # Scrape Spring Boot application metrics
+  - job_name: 'ledger-core'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']  # Matches default server.port
+        labels:
+          application: 'ledger-core'
+          environment: 'development'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
