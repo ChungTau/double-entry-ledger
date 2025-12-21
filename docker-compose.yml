@@ -120,6 +120,35 @@ services:
     networks:
       - ledger-net
 
+  # API Gateway (Go + Gin)
+  gateway:
+    build:
+      context: ./apps/gateway
+      dockerfile: Dockerfile
+    container_name: ledger-gateway
+    ports:
+      - "8081:8081"
+    environment:
+      GATEWAY_PORT: "8081"
+      GRPC_LEDGER_ADDR: "host.docker.internal:9098"
+      REDIS_ADDR: "redis:6379"
+      JWT_SECRET: "${JWT_SECRET:-dev-secret-key}"
+      RATE_LIMIT_RPS: "10"
+      RATE_LIMIT_BURST: "20"
+      MOCK_MODE: "false"
+      DEV_MODE: "true"
+    depends_on:
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ledger-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   audit-service:
     build:
       context: ./apps/audit

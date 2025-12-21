@@ -6,6 +6,9 @@ option java_multiple_files = true;
 option java_package = "com.chungtau.ledger.grpc.v1";
 option java_outer_classname = "LedgerProto";
 
+// Go options for API Gateway
+option go_package = "github.com/chungtau/ledger-gateway/gen/proto/v1;ledgerv1";
+
 service LedgerService {
   rpc CreateTransaction (CreateTransactionRequest) returns (TransactionResponse);
   
