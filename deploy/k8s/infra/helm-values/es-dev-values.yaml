@@ -1,0 +1,42 @@
+# Elasticsearch Helm Values - Development Environment
+# Chart: elastic/elasticsearch
+
+# Single node for development
+replicas: 1
+minimumMasterNodes: 1
+
+# Resource limits for Minikube
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# Persistence
+volumeClaimTemplate:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+
+# Elasticsearch configuration - security disabled for dev
+esConfig:
+  elasticsearch.yml: |
+    xpack.security.enabled: false
+    xpack.security.enrollment.enabled: false
+    xpack.security.http.ssl.enabled: false
+    xpack.security.transport.ssl.enabled: false
+
+# Enable sysctl init container for vm.max_map_count
+sysctlInitContainer:
+  enabled: true
+
+# Antiaffinity disabled for single node
+antiAffinity: "soft"
+
+# Disable PDB for single node dev
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

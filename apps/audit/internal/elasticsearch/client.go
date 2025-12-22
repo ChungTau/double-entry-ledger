@@ -3,9 +3,11 @@ package elasticsearch
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -25,9 +27,12 @@ type Client struct {
 
 // Config holds Elasticsearch connection configuration
 type Config struct {
-	URL         string
-	Index       string
-	DLQProducer *dlq.Producer
+	URL          string
+	Index        string
+	Username     string
+	Password     string
+	SkipTLSVerify bool
+	DLQProducer  *dlq.Producer
 }
 
 // TransactionDocument represents the document to be indexed
@@ -72,9 +77,18 @@ const indexMapping = `{
 // NewClient creates a new Elasticsearch client wrapper
 func NewClient(cfg Config) (*Client, error) {
 	esCfg := elasticsearch.Config{
-		Addresses: []string{cfg.URL},
+		Addresses:     []string{cfg.URL},
+		Username:      cfg.Username,
+		Password:      cfg.Password,
 		RetryOnStatus: []int{502, 503, 504, 429},
 		MaxRetries:    3,
+	}
+
+	// Skip TLS verification for dev environment
+	if cfg.SkipTLSVerify {
+		esCfg.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
 	}
 
 	es, err := elasticsearch.NewClient(esCfg)

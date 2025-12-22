@@ -35,9 +35,18 @@ spec:
               value: "ledger-audit-consumer"
             # Elasticsearch connection via K8s DNS
             - name: ELASTICSEARCH_URL
-              value: "http://elasticsearch-master:9200"
+              value: "https://elasticsearch-master:9200"
             - name: ELASTICSEARCH_INDEX
               value: "transactions"
+            - name: ELASTICSEARCH_USERNAME
+              value: "elastic"
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-master-credentials
+                  key: password
+            - name: ELASTICSEARCH_SKIP_TLS_VERIFY
+              value: "true"
           resources:
             requests:
               memory: "64Mi"
