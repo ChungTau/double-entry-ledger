@@ -31,7 +31,8 @@
       "Bash(kubectl delete:*)",
       "Bash(kubectl get:*)",
       "Bash(kubectl logs:*)",
-      "Bash(helm list:*)"
+      "Bash(helm list:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
         - name: ledger-gateway
-          image: ledger-gateway:local
-          imagePullPolicy: Never
+          image: ghcr.io/chungtau/ledger-gateway:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8081

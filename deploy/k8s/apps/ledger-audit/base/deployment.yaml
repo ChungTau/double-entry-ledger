@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
         - name: ledger-audit
-          image: ledger-audit:local
-          imagePullPolicy: Never
+          image: ghcr.io/chungtau/ledger-audit:latest
+          imagePullPolicy: Always
           env:
             # Kafka connection via K8s DNS
             - name: KAFKA_BROKER
