@@ -115,17 +115,30 @@ flowchart LR
 ### Platform-Specific Notes
 
 #### Windows 11
-- Use **PowerShell** (not CMD) for most commands
-- Run PowerShell as **Administrator** when editing hosts file
-- Use `minikube tunnel` to access Ingress (run in separate terminal)
-- Use `curl.exe` instead of `curl` to avoid PowerShell alias issues
-- For Docker environment: `minikube docker-env | Invoke-Expression`
+
+| Topic | Details |
+|-------|---------|
+| **Shell** | Use **PowerShell** (not CMD) for most commands |
+| **Line continuation** | Use backtick (`` ` ``) instead of backslash (`\`) |
+| **Network Access** | **Must** run `minikube tunnel` in a separate **Administrator** terminal |
+| **Ingress IP** | Use **`127.0.0.1`** (via tunnel), **NOT** `minikube ip` |
+| **curl** | Use `curl.exe` to avoid PowerShell alias issues |
+| **JSON in curl** | Use escaped double quotes or variables (see [Testing API](#testing-api)) |
+| **Hosts file** | Edit as Administrator: `C:\Windows\System32\drivers\etc\hosts` |
+| **Docker env** | `minikube docker-env \| Invoke-Expression` |
 
 #### Linux/macOS
-- Use any terminal emulator
-- Use `sudo` for hosts file editing
-- Ingress works directly with Minikube IP
-- For Docker environment: `eval $(minikube docker-env)`
+
+| Topic | Details |
+|-------|---------|
+| **Shell** | Any terminal emulator with Bash |
+| **Line continuation** | Use backslash (`\`) |
+| **Network Access** | `minikube tunnel` is optional; `minikube ip` works natively |
+| **Ingress IP** | Use output of **`minikube ip`** |
+| **curl** | Standard `curl` command |
+| **JSON in curl** | Use single quotes (`'`) for JSON bodies |
+| **Hosts file** | Edit with `sudo`: `/etc/hosts` |
+| **Docker env** | `eval $(minikube docker-env)` |
 
 ---
 
@@ -193,7 +206,7 @@ helm install elasticsearch elastic/elasticsearch `
 kubectl get pods -n ledger-dev
 ```
 
-> **Windows Note**: Use backtick (`) for line continuation instead of backslash (\\)
+> **Windows Note**: Use backtick (`` ` ``) for line continuation instead of backslash (`\`)
 
 ---
 
@@ -212,6 +225,28 @@ minikube status
 minikube addons enable ingress
 minikube addons enable metrics-server  # Optional, for resource monitoring
 ```
+
+### Step 1.1: Configure Ingress for Windows (Windows Only)
+
+On Windows with Minikube's Docker driver, `minikube ip` returns an IP that is not directly accessible. You must use `minikube tunnel` to expose services, which requires the Ingress controller to be of type `LoadBalancer`.
+
+**Windows (PowerShell as Administrator):**
+
+```powershell
+# 1. Patch ingress-nginx-controller to LoadBalancer type
+kubectl patch svc ingress-nginx-controller -n ingress-nginx `
+  --type='json' `
+  -p='[{"op": "replace", "path": "/spec/type", "value":"LoadBalancer"}]'
+
+# 2. Start minikube tunnel in a SEPARATE Administrator PowerShell (keep it running)
+minikube tunnel
+```
+
+> **Important**: The `minikube tunnel` command must remain running in a separate terminal window. It requires Administrator privileges.
+
+**Linux/macOS:**
+
+No patch is needed. The default `NodePort` type works with `minikube ip`. If you prefer to use `minikube tunnel`, you can apply the same patch.
 
 ### Step 2: Configure Docker Environment
 
@@ -374,46 +409,54 @@ kubectl apply -f deploy/k8s/ingress/ingress.yaml
 
 ### Step 6: Configure Local DNS
 
-First, get Minikube IP:
-```bash
-minikube ip
+#### Windows 11
+
+On Windows, the Ingress is accessed via `minikube tunnel` at **`127.0.0.1`**.
+
+**Option 1: Manual Edit (Recommended)**
+1. Open Notepad as **Administrator**
+2. Open file: `C:\Windows\System32\drivers\etc\hosts`
+3. Add the following line:
+   ```
+   127.0.0.1 api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local
+   ```
+4. Save file
+
+**Option 2: Command Line (CMD as Administrator)**
+```cmd
+echo 127.0.0.1 api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local >> C:\Windows\System32\drivers\etc\hosts
 ```
 
-**Linux/macOS:**
+#### Linux/macOS
+
+On Linux/macOS, use the output of `minikube ip`.
+
 ```bash
-# Add to hosts file (replace <MINIKUBE_IP> with actual IP)
-echo "<MINIKUBE_IP> api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local" | sudo tee -a /etc/hosts
+# Get Minikube IP
+MINIKUBE_IP=$(minikube ip)
+echo "Minikube IP: $MINIKUBE_IP"
+
+# Add to hosts file
+echo "$MINIKUBE_IP api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local" | sudo tee -a /etc/hosts
 
 # Verify
-cat /etc/hosts
+cat /etc/hosts | grep ledger
 ```
-
-**Windows (CMD as Administrator):**
-```cmd
-:: Add to hosts file (replace <MINIKUBE_IP> with actual IP)
-echo <MINIKUBE_IP> api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local >> C:\Windows\System32\drivers\etc\hosts
-
-:: Verify
-type C:\Windows\System32\drivers\etc\hosts
-```
-
-**Windows (Manual Edit):**
-1. Open Notepad as Administrator
-2. Open file: `C:\Windows\System32\drivers\etc\hosts`
-3. Add line: `<MINIKUBE_IP> api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local`
-4. Save file
 
 ---
 
 ## Accessing Services
 
-### Via Ingress
+### Starting minikube tunnel (Windows Only)
 
-> **Windows Important**: You must run `minikube tunnel` in a separate Administrator terminal for Ingress to work on Windows.
-> ```powershell
-> # Run in separate Administrator PowerShell (keep it running)
-> minikube tunnel
-> ```
+> **Windows Important**: Before accessing any services via Ingress on Windows, you **must** run `minikube tunnel` in a separate Administrator terminal.
+
+```powershell
+# Run in separate Administrator PowerShell (keep it running)
+minikube tunnel
+```
+
+### Via Ingress
 
 | Service | URL | Description |
 |---------|-----|-------------|
@@ -422,7 +465,23 @@ type C:\Windows\System32\drivers\etc\hosts
 | Kibana | http://kibana.ledger.local | Log query interface |
 | Prometheus | http://prometheus.ledger.local | Metrics & monitoring |
 
+### Database Seeding (Required Before Testing)
+
+Before testing the API, you must seed the database with test accounts. This prevents 404 errors when creating transactions.
+
+**All Platforms:**
+```bash
+kubectl exec -i postgresql-0 -n ledger-dev -- env PGPASSWORD=password psql -U user -d ledger_db -c "INSERT INTO accounts (id, user_id, balance, currency, version) VALUES ('11111111-1111-1111-1111-111111111111', 'user-a', 1000.00, 'USD', 0), ('22222222-2222-2222-2222-222222222222', 'user-b', 1000.00, 'USD', 0) ON CONFLICT DO NOTHING;"
+```
+
+Expected output:
+```
+INSERT 0 2
+```
+
 ### Testing API
+
+#### Health Check
 
 **Linux/macOS:**
 ```bash
@@ -438,7 +497,93 @@ curl.exe http://api.ledger.local/health
 Invoke-RestMethod http://api.ledger.local/health
 ```
 
+#### Generate JWT Token
+
+**Linux/macOS (Bash):**
+```bash
+# Generate token and save to variable
+TOKEN=$(curl -s -X POST http://api.ledger.local/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user-a", "roles": ["user"]}' | jq -r '.token')
+
+echo "Token: $TOKEN"
+```
+
+**Windows (PowerShell):**
+```powershell
+# Method 1: Using curl.exe with escaped quotes
+$response = curl.exe -s -X POST http://api.ledger.local/api/v1/auth/token `
+  -H "Content-Type: application/json" `
+  -d "{`"user_id`": `"user-a`", `"roles`": [`"user`"]}"
+
+$TOKEN = ($response | ConvertFrom-Json).token
+Write-Host "Token: $TOKEN"
+
+# Method 2: Using Invoke-RestMethod (recommended)
+$body = @{
+    user_id = "user-a"
+    roles = @("user")
+} | ConvertTo-Json
+
+$response = Invoke-RestMethod -Uri "http://api.ledger.local/api/v1/auth/token" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+
+$TOKEN = $response.token
+Write-Host "Token: $TOKEN"
+```
+
+#### Create Transaction
+
+**Linux/macOS (Bash):**
+```bash
+curl -X POST http://api.ledger.local/api/v1/transactions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
+  -d '{
+    "source_account_id": "11111111-1111-1111-1111-111111111111",
+    "destination_account_id": "22222222-2222-2222-2222-222222222222",
+    "amount": "100.00",
+    "currency": "USD",
+    "description": "Test transfer"
+  }'
+```
+
+**Windows (PowerShell):**
+```powershell
+# Method 1: Using curl.exe with escaped quotes
+curl.exe -X POST http://api.ledger.local/api/v1/transactions `
+  -H "Content-Type: application/json" `
+  -H "Authorization: Bearer $TOKEN" `
+  -H "X-Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" `
+  -d "{`"source_account_id`": `"11111111-1111-1111-1111-111111111111`", `"destination_account_id`": `"22222222-2222-2222-2222-222222222222`", `"amount`": `"100.00`", `"currency`": `"USD`", `"description`": `"Test transfer`"}"
+
+# Method 2: Using Invoke-RestMethod (recommended)
+$body = @{
+    source_account_id = "11111111-1111-1111-1111-111111111111"
+    destination_account_id = "22222222-2222-2222-2222-222222222222"
+    amount = "100.00"
+    currency = "USD"
+    description = "Test transfer"
+} | ConvertTo-Json
+
+$headers = @{
+    "Authorization" = "Bearer $TOKEN"
+    "X-Idempotency-Key" = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+}
+
+Invoke-RestMethod -Uri "http://api.ledger.local/api/v1/transactions" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Headers $headers `
+  -Body $body
+```
+
 ### Via Port Forward
+
+If Ingress is not working, you can use port forwarding as an alternative:
 
 ```bash
 # API Gateway (HTTP)
@@ -584,7 +729,70 @@ flowchart TD
 
 ### Common Issues
 
-#### 1. Pod in Pending State
+#### 1. Ingress EXTERNAL-IP Pending (Windows)
+
+**Symptom:** `kubectl get svc -n ingress-nginx` shows `EXTERNAL-IP` as `<pending>`
+
+**Cause:** On Windows with Docker driver, `minikube tunnel` is required but the Ingress controller service type may be `NodePort` instead of `LoadBalancer`.
+
+**Fix:**
+```powershell
+# 1. Patch the ingress controller to LoadBalancer type
+kubectl patch svc ingress-nginx-controller -n ingress-nginx `
+  --type='json' `
+  -p='[{"op": "replace", "path": "/spec/type", "value":"LoadBalancer"}]'
+
+# 2. Verify patch applied
+kubectl get svc ingress-nginx-controller -n ingress-nginx
+
+# 3. Ensure minikube tunnel is running in Administrator PowerShell
+minikube tunnel
+```
+
+#### 2. Connection Timeout to api.ledger.local (Windows)
+
+**Symptom:** `curl.exe http://api.ledger.local/health` times out
+
+**Checklist:**
+1. Is `minikube tunnel` running in a separate Administrator terminal?
+2. Is the hosts file mapping to `127.0.0.1` (not `minikube ip` output)?
+3. Is the Ingress controller patched to `LoadBalancer` type?
+
+**Verify:**
+```powershell
+# Check tunnel is running (should show routes)
+# In the terminal running minikube tunnel, you should see output like:
+# Status: machine: minikube
+#         pid: 12345
+#         route: 10.96.0.0/12 -> 192.168.49.2
+
+# Check hosts file
+type C:\Windows\System32\drivers\etc\hosts | findstr ledger
+
+# Check ingress controller
+kubectl get svc ingress-nginx-controller -n ingress-nginx
+```
+
+#### 3. JSON Parse Error / INVALID_ARGUMENT (Windows PowerShell)
+
+**Symptom:** API returns `INVALID_ARGUMENT` or JSON parse errors when using `curl`
+
+**Cause:** PowerShell's `curl` alias (`Invoke-WebRequest`) handles JSON differently than `curl.exe`.
+
+**Fix:** Use `curl.exe` explicitly with proper escaping:
+```powershell
+# Wrong (PowerShell alias)
+curl -d '{"user_id": "test"}'
+
+# Correct (explicit curl.exe with escaped quotes)
+curl.exe -d "{`"user_id`": `"test`"}"
+
+# Best (use Invoke-RestMethod with ConvertTo-Json)
+$body = @{ user_id = "test" } | ConvertTo-Json
+Invoke-RestMethod -Uri "http://..." -Method POST -Body $body -ContentType "application/json"
+```
+
+#### 4. Pod in Pending State
 
 ```bash
 # Check reason
@@ -595,7 +803,7 @@ kubectl describe pod <pod-name> -n ledger-dev
 # - PVC cannot bind: Check StorageClass
 ```
 
-#### 2. ImagePullBackOff Error
+#### 5. ImagePullBackOff Error
 
 **Linux/macOS:**
 ```bash
@@ -619,7 +827,7 @@ docker build -t <image>:local -f <Dockerfile> .
 minikube image load <image>:local
 ```
 
-#### 3. CrashLoopBackOff Error
+#### 6. CrashLoopBackOff Error
 
 ```bash
 # View current logs
@@ -632,7 +840,7 @@ kubectl logs <pod-name> -n ledger-dev --previous
 kubectl describe pod <pod-name> -n ledger-dev
 ```
 
-#### 4. Service Unreachable
+#### 7. Service Unreachable
 
 ```bash
 # Check service endpoints
@@ -646,6 +854,14 @@ kubectl run -it --rm debug --image=busybox --restart=Never \
 kubectl run -it --rm debug --image=busybox --restart=Never \
   -- nc -zv postgresql 5432
 ```
+
+#### 8. 404 Not Found on Transaction API
+
+**Symptom:** POST to `/api/v1/transactions` returns 404
+
+**Cause:** Database is not seeded with test accounts.
+
+**Fix:** Run the database seeding command (see [Database Seeding](#database-seeding-required-before-testing)).
 
 ### Useful Commands
 
