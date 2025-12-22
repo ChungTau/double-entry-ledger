@@ -254,6 +254,8 @@ kubectl get ns ledger-dev
 kubectl get secrets -n ledger-dev
 ```
 
+> **Production Note**: The provided `secrets.yaml` contains plain Base64-encoded passwords suitable for development only. For production, use [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) or [External Secrets Operator](https://external-secrets.io/) to manage secrets securely.
+
 ### Step 4: Install Infrastructure Services
 
 #### 4.1 Add Helm Repos
@@ -333,11 +335,13 @@ kubectl wait --for=condition=ready pod -l app=ledger-cluster-master \
 
 #### 5.1 Build Docker Images
 
+> **Important**: All Dockerfiles are designed to be built from the **project root directory**. The build context must be `.` (current directory = project root), not the individual app directories.
+
 ```bash
 # Make sure you're in the project root directory
 cd /path/to/double-entry-ledger
 
-# Build all services
+# Build all services (note: build context is "." = project root)
 docker build -t ledger-core:local -f apps/core/Dockerfile .
 docker build -t ledger-gateway:local -f apps/gateway/Dockerfile .
 docker build -t ledger-audit:local -f apps/audit/Dockerfile .
@@ -348,6 +352,8 @@ docker images | grep ledger
 # Windows (PowerShell):
 docker images | findstr ledger
 ```
+
+> **Common Mistake**: Do NOT run `cd apps/gateway && docker build .` - this will fail because the Dockerfile expects the build context to include `api/proto` directory which is at project root level.
 
 #### 5.2 Deploy Microservices (Kustomize)
 
@@ -700,7 +706,6 @@ deploy/k8s/
 │   ├── helm-values/             # Helm values configuration
 │   │   ├── postgresql-values.yaml
 │   │   ├── redis-values.yaml
-│   │   ├── kafka-values.yaml    # (unused, using Kustomize instead)
 │   │   ├── elasticsearch-values.yaml
 │   │   ├── kibana-values.yaml
 │   │   └── prometheus-values.yaml
