@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-gateway
+  labels:
+    app: ledger-gateway
+    version: v1
+    app.kubernetes.io/name: ledger-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: double-entry-ledger
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ledger-gateway
+  template:
+    metadata:
+      labels:
+        app: ledger-gateway
+        version: v1
+    spec:
+      containers:
+        - name: ledger-gateway
+          image: ledger-gateway:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          env:
+            # Server settings
+            - name: GATEWAY_PORT
+              value: "8081"
+            # gRPC connection to ledger-core via K8s DNS
+            - name: GRPC_LEDGER_ADDR
+              value: "ledger-core:9098"
+            - name: GRPC_TIMEOUT_MS
+              value: "5000"
+            # Redis connection via K8s DNS
+            - name: REDIS_ADDR
+              value: "redis-master:6379"
+            # JWT settings from secret
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ledger-secrets
+                  key: jwt-secret
+            # Rate limiting
+            - name: RATE_LIMIT_RPS
+              value: "10"
+            - name: RATE_LIMIT_BURST
+              value: "20"
+            # Feature flags
+            - name: MOCK_MODE
+              value: "false"
+            - name: DEV_MODE
+              value: "false"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 15

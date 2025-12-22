@@ -20,7 +20,18 @@
       "Bash(mvn clean compile:*)",
       "Bash(mvn spring-boot:run:*)",
       "Bash(timeout 10 tail:*)",
-      "Bash(exit 0)"
+      "Bash(exit 0)",
+      "Bash(kubectl describe:*)",
+      "Bash(minikube ssh:*)",
+      "Bash(curl:*)",
+      "Bash(minikube delete:*)",
+      "Bash(minikube start:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(helm install:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(helm list:*)"
     ]
   }
 }

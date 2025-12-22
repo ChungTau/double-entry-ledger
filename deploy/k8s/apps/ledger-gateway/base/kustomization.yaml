@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ledger-gateway
+
+namespace: ledger-dev
+
+commonLabels:
+  app.kubernetes.io/name: ledger-gateway
+  app.kubernetes.io/component: api-gateway
+  app.kubernetes.io/part-of: double-entry-ledger
+  app.kubernetes.io/managed-by: kustomize
+
+resources:
+  - deployment.yaml
+  - service.yaml

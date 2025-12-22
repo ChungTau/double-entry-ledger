@@ -1,0 +1,48 @@
+# Redis Helm Values - Development Environment
+# Chart: oci://registry-1.docker.io/bitnamicharts/redis
+# Install: helm install redis oci://registry-1.docker.io/bitnamicharts/redis -f redis-values.yaml -n ledger-dev
+
+image:
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Architecture: standalone for dev, replication for prod
+architecture: standalone
+
+# Disable authentication for dev (enable in production)
+auth:
+  enabled: false
+
+master:
+  # Persistence configuration
+  persistence:
+    enabled: true
+    size: 1Gi
+
+  # Resource limits for Minikube (dev environment)
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
+
+  # Redis configuration matching docker-compose
+  configuration: |
+    appendonly yes
+    appendfsync everysec
+    maxmemory 100mb
+    maxmemory-policy allkeys-lru
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    ports:
+      redis: 6379
+
+# Metrics for Prometheus scraping (disabled until Prometheus CRDs are installed)
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false

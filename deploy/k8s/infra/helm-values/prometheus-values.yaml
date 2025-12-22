@@ -1,0 +1,85 @@
+# Prometheus Stack Helm Values - Development Environment (Minimal)
+# Chart: prometheus-community/kube-prometheus-stack
+# Install:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml -n ledger-dev
+
+# Prometheus configuration
+prometheus:
+  prometheusSpec:
+    # Retention period
+    retention: 7d
+
+    # Resource limits for Minikube
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+    # Storage
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+    # Additional scrape configs for ledger services
+    additionalScrapeConfigs:
+      - job_name: 'ledger-core'
+        metrics_path: '/actuator/prometheus'
+        scrape_interval: 15s
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - ledger-dev
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: ledger-core
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "8080"
+            action: keep
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+  service:
+    type: ClusterIP
+    port: 9090
+
+# Disable Grafana in dev to save resources (enable in prod)
+grafana:
+  enabled: false
+
+# Disable Alertmanager in dev to save resources (enable in prod)
+alertmanager:
+  enabled: false
+
+# Disable default rules for minimal setup
+defaultRules:
+  create: false
+
+# Disable kube-state-metrics for minimal setup
+kubeStateMetrics:
+  enabled: false
+
+# Disable node-exporter for minimal setup
+nodeExporter:
+  enabled: false
+
+# Disable prometheus-operator for minimal setup
+prometheusOperator:
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "200m"

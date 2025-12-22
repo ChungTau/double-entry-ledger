@@ -1,0 +1,85 @@
+# Elasticsearch Helm Values - Development Environment
+# Chart: https://helm.elastic.co - elasticsearch
+# Install:
+#   helm repo add elastic https://helm.elastic.co
+#   helm install elasticsearch elastic/elasticsearch -f elasticsearch-values.yaml -n ledger-dev
+
+# Single node for development
+replicas: 1
+minimumMasterNodes: 1
+
+image: "docker.elastic.co/elasticsearch/elasticsearch"
+imageTag: "8.11.3"
+imagePullPolicy: IfNotPresent
+
+# Cluster configuration
+clusterName: "ledger-cluster"
+
+# JVM Heap - reduced for dev environment (1GB instead of 2GB)
+esJavaOpts: "-Xmx1g -Xms1g"
+
+# Resource limits for Minikube
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+# Persistence
+volumeClaimTemplate:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+
+# Elasticsearch configuration - security disabled for dev
+esConfig:
+  elasticsearch.yml: |
+    cluster.name: ledger-cluster
+    node.name: ${HOSTNAME}
+    network.host: 0.0.0.0
+    xpack.security.enabled: false
+    xpack.security.enrollment.enabled: false
+    xpack.security.http.ssl.enabled: false
+    xpack.security.transport.ssl.enabled: false
+
+# Enable sysctl init container for vm.max_map_count
+sysctlInitContainer:
+  enabled: true
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+
+# Service configuration
+service:
+  type: ClusterIP
+  httpPortName: http
+  httpPort: 9200
+  transportPortName: transport
+  transportPort: 9300
+
+# Health checks
+readinessProbe:
+  failureThreshold: 3
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  successThreshold: 3
+  timeoutSeconds: 5
+
+# Disable PDB for single node dev
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Antiaffinity disabled for single node
+antiAffinity: "soft"
+
+# Node selector (optional)
+nodeSelector: {}
+
+# Tolerations (optional)
+tolerations: []

@@ -1,0 +1,66 @@
+# PostgreSQL Helm Values - Development Environment
+# Chart: oci://registry-1.docker.io/bitnamicharts/postgresql
+# Install: helm install postgresql oci://registry-1.docker.io/bitnamicharts/postgresql -f postgresql-values.yaml -n ledger-dev
+
+global:
+  postgresql:
+    auth:
+      database: ledger_db
+      username: user
+      # For dev, using simple password; use existingSecret in production
+      password: password
+
+image:
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Architecture: standalone for dev, replication for prod
+architecture: standalone
+
+primary:
+  # Persistence configuration
+  persistence:
+    enabled: true
+    size: 10Gi
+    # storageClass: ""  # Use default storage class
+
+  # Resource limits for Minikube (dev environment)
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  # Connection pool settings
+  extendedConfiguration: |
+    max_connections = 100
+    shared_buffers = 64MB
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    ports:
+      postgresql: 5432
+
+  # Health checks
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 6
+
+# Metrics for Prometheus scraping (disabled until Prometheus CRDs are installed)
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
