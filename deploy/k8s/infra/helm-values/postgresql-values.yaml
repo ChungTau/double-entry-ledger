@@ -11,7 +11,7 @@ global:
       password: password
 
 image:
-  tag: "18"
+  tag: "latest"
   pullPolicy: IfNotPresent
 
 # Architecture: standalone for dev, replication for prod
@@ -59,11 +59,8 @@ primary:
     timeoutSeconds: 3
     failureThreshold: 6
 
-# Metrics for Prometheus scraping
+# Metrics for Prometheus scraping (disabled until Prometheus CRDs are installed)
 metrics:
-  enabled: true
+  enabled: false
   serviceMonitor:
-    enabled: true
-    namespace: ledger-dev
-    labels:
-      release: prometheus
+    enabled: false

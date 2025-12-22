@@ -1,26 +1,32 @@
 # ============================================
 # Stage 1: Build with Maven dependency caching
 # ============================================
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
-# Install Maven
-RUN apk add --no-cache maven
+# Step 1: Copy Maven Wrapper and POM first for dependency caching
+# 我們複製 mvnw 和 .mvn 目錄，這樣就不需要安裝系統 Maven
+COPY apps/core/.mvn ./apps/core/.mvn
+COPY apps/core/mvnw ./apps/core/mvnw
+COPY apps/core/pom.xml ./apps/core/pom.xml
 
-# Step 1: Copy POM first for dependency caching (Docker layer cache)
-COPY apps/core/pom.xml ./apps/core/
 WORKDIR /app/apps/core
 
-# Step 2: Download dependencies (cached unless pom.xml changes)
-RUN mvn dependency:go-offline -B
+# 確保 mvnw 有執行權限
+RUN chmod +x mvnw
+
+# Step 2: Download dependencies using the Wrapper
+# 使用 ./mvnw 而不是 mvn
+RUN ./mvnw dependency:go-offline -B
 
 # Step 3: Copy proto files (needed for gRPC code generation)
 COPY api/proto /app/api/proto
 
 # Step 4: Copy source code and build
 COPY apps/core/src ./src
-RUN mvn package -DskipTests -B
+# 使用 ./mvnw 進行打包
+RUN ./mvnw package -DskipTests -B
 
 # ============================================
 # Stage 2: Runtime

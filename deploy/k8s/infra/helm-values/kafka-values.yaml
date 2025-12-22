@@ -2,9 +2,7 @@
 # Chart: oci://registry-1.docker.io/bitnamicharts/kafka
 # Install: helm install kafka oci://registry-1.docker.io/bitnamicharts/kafka -f kafka-values.yaml -n ledger-dev
 
-image:
-  tag: "4.0"
-  pullPolicy: IfNotPresent
+# Use default image from Helm chart
 
 # KRaft mode (no ZooKeeper required)
 kraft:
@@ -85,14 +83,11 @@ service:
   ports:
     client: 9092
 
-# Metrics for Prometheus scraping
+# Metrics for Prometheus scraping (disabled until Prometheus CRDs are installed)
 metrics:
   kafka:
-    enabled: true
+    enabled: false
   jmx:
-    enabled: true
+    enabled: false
   serviceMonitor:
-    enabled: true
-    namespace: ledger-dev
-    labels:
-      release: prometheus
+    enabled: false

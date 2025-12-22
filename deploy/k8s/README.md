@@ -1,212 +1,443 @@
 # Kubernetes Deployment Guide
 
-本指南說明如何將 Double-Entry-Ledger 微服務部署到 Minikube (本地 Kubernetes 集群)。
+This guide explains how to deploy the Double-Entry-Ledger microservices to Minikube (local Kubernetes cluster).
 
-## 目錄
+## Table of Contents
 
-- [前置需求](#前置需求)
-- [快速開始](#快速開始)
-- [詳細部署步驟](#詳細部署步驟)
-- [服務存取](#服務存取)
+- [Architecture Overview](#architecture-overview)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Detailed Deployment Steps](#detailed-deployment-steps)
+- [Accessing Services](#accessing-services)
 - [ArgoCD GitOps](#argocd-gitops)
-- [故障排除](#故障排除)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## 前置需求
+## Architecture Overview
 
-### 硬體需求
-- **RAM**: 最少 16GB (建議 20GB+)
-- **CPU**: 4 cores 以上
-- **硬碟**: 50GB 可用空間
+```mermaid
+graph TB
+    subgraph Minikube["Minikube Cluster"]
+        subgraph NS["Namespace: ledger-dev"]
+            subgraph Apps["Applications"]
+                GW[ledger-gateway<br/>Go :8081]
+                CORE[ledger-core<br/>Java 21 :9098]
+                AUDIT[ledger-audit<br/>Go :8082]
+            end
 
-### 軟體需求
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Minikube](https://minikube.sigs.k8s.io/docs/start/)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Helm](https://helm.sh/docs/intro/install/) (v3+)
-- [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/) (可選，kubectl 內建)
+            subgraph Infra["Infrastructure"]
+                PG[(PostgreSQL<br/>:5432)]
+                REDIS[(Redis<br/>:6379)]
+                KAFKA[Kafka<br/>:9092]
+                ES[(Elasticsearch<br/>:9200)]
+                KIBANA[Kibana<br/>:5601]
+                PROM[Prometheus<br/>:9090]
+            end
+
+            GW -->|gRPC| CORE
+            CORE --> PG
+            CORE --> REDIS
+            CORE --> KAFKA
+            AUDIT --> KAFKA
+            AUDIT --> ES
+            KIBANA --> ES
+            PROM -.->|scrape| CORE
+            PROM -.->|scrape| GW
+            PROM -.->|scrape| AUDIT
+        end
+
+        ING[Ingress Controller]
+    end
+
+    USER((User)) --> ING
+    ING --> GW
+    ING --> KIBANA
+    ING --> PROM
+```
+
+### Deployment Methods
+
+```mermaid
+flowchart LR
+    subgraph Helm["Helm Charts"]
+        PG[PostgreSQL]
+        REDIS[Redis]
+        ES[Elasticsearch]
+        KIBANA[Kibana]
+        PROM[Prometheus Stack]
+    end
+
+    subgraph Kustomize["Kustomize"]
+        KAFKA[Kafka 4.0.0]
+        CORE[ledger-core]
+        GW[ledger-gateway]
+        AUDIT[ledger-audit]
+        KUI[kafka-ui]
+    end
+```
+
+### Technology Stack
+
+| Category | Technology | Description |
+|----------|------------|-------------|
+| **Orchestration** | Kubernetes (Minikube) | Local development environment |
+| **Package Management** | Helm 3 | Infrastructure services management |
+| **Configuration** | Kustomize | Base/overlay structure for apps |
+| **GitOps** | ArgoCD | Automated deployment & sync |
+| **Message Queue** | Apache Kafka 4.0.0 | KRaft mode (no Zookeeper) |
+| **Database** | PostgreSQL 18 | Bitnami Helm Chart |
+| **Cache** | Redis 8 | Bitnami Helm Chart |
+| **Search Engine** | Elasticsearch 8.11 | Elastic Helm Chart |
+| **Monitoring** | Prometheus | kube-prometheus-stack (minimal) |
 
 ---
 
-## 快速開始
+## Prerequisites
+
+### Hardware Requirements
+
+| Item | Minimum | Recommended |
+|------|---------|-------------|
+| RAM | 16 GB | 20 GB+ |
+| CPU | 4 cores | 6 cores+ |
+| Disk | 50 GB | 100 GB |
+
+### Software Requirements
+
+| Software | Version | Installation Link |
+|----------|---------|-------------------|
+| Docker Desktop | Latest | [Download](https://www.docker.com/products/docker-desktop/) |
+| Minikube | v1.32+ | [Download](https://minikube.sigs.k8s.io/docs/start/) |
+| kubectl | v1.28+ | [Download](https://kubernetes.io/docs/tasks/tools/) |
+| Helm | v3.12+ | [Download](https://helm.sh/docs/intro/install/) |
+
+### Platform-Specific Notes
+
+#### Windows 11
+- Use **PowerShell** (not CMD) for most commands
+- Run PowerShell as **Administrator** when editing hosts file
+- Use `minikube tunnel` to access Ingress (run in separate terminal)
+- Use `curl.exe` instead of `curl` to avoid PowerShell alias issues
+- For Docker environment: `minikube docker-env | Invoke-Expression`
+
+#### Linux/macOS
+- Use any terminal emulator
+- Use `sudo` for hosts file editing
+- Ingress works directly with Minikube IP
+- For Docker environment: `eval $(minikube docker-env)`
+
+---
+
+## Quick Start
+
+### Linux/macOS
 
 ```bash
-# 1. 啟動 Minikube (配置足夠資源)
+# 1. Start Minikube
 minikube start --cpus 4 --memory 12288 --driver=docker
 
-# 2. 啟用 Ingress addon
+# 2. Enable Ingress
 minikube addons enable ingress
 
-# 3. 指向 Minikube Docker daemon (重要！)
+# 3. Configure Docker environment (Important! Run for each new terminal)
 eval $(minikube docker-env)
 
-# 4. 建立 Namespace
+# 4. Create Namespace and Secrets
 kubectl apply -f deploy/k8s/infra/namespace.yaml
-
-# 5. 部署 Secrets
 kubectl apply -f deploy/k8s/secrets/secrets.yaml
 
-# 6. 安裝基礎設施 (Helm)
-./deploy/k8s/scripts/install-infra.sh  # 或手動執行下方指令
+# 5. Install Infrastructure (Prometheus first for CRDs)
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -f deploy/k8s/infra/helm-values/prometheus-values.yaml -n ledger-dev
+helm install postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
+  -f deploy/k8s/infra/helm-values/postgresql-values.yaml -n ledger-dev
+helm install redis oci://registry-1.docker.io/bitnamicharts/redis \
+  -f deploy/k8s/infra/helm-values/redis-values.yaml -n ledger-dev
+kubectl apply -k deploy/k8s/infra/kafka
+helm install elasticsearch elastic/elasticsearch \
+  -f deploy/k8s/infra/helm-values/elasticsearch-values.yaml -n ledger-dev
 
-# 7. Build 並部署應用程式
-./deploy/k8s/scripts/deploy-apps.sh    # 或手動執行下方指令
+# 6. Verify Installation
+kubectl get pods -n ledger-dev
 ```
+
+### Windows 11 (PowerShell)
+
+```powershell
+# 1. Start Minikube
+minikube start --cpus 4 --memory 12288 --driver=docker
+
+# 2. Enable Ingress
+minikube addons enable ingress
+
+# 3. Configure Docker environment (Important! Run for each new terminal)
+minikube docker-env | Invoke-Expression
+
+# 4. Create Namespace and Secrets
+kubectl apply -f deploy/k8s/infra/namespace.yaml
+kubectl apply -f deploy/k8s/secrets/secrets.yaml
+
+# 5. Install Infrastructure (Prometheus first for CRDs)
+helm install prometheus prometheus-community/kube-prometheus-stack `
+  -f deploy/k8s/infra/helm-values/prometheus-values.yaml -n ledger-dev
+helm install postgresql oci://registry-1.docker.io/bitnamicharts/postgresql `
+  -f deploy/k8s/infra/helm-values/postgresql-values.yaml -n ledger-dev
+helm install redis oci://registry-1.docker.io/bitnamicharts/redis `
+  -f deploy/k8s/infra/helm-values/redis-values.yaml -n ledger-dev
+kubectl apply -k deploy/k8s/infra/kafka
+helm install elasticsearch elastic/elasticsearch `
+  -f deploy/k8s/infra/helm-values/elasticsearch-values.yaml -n ledger-dev
+
+# 6. Verify Installation
+kubectl get pods -n ledger-dev
+```
+
+> **Windows Note**: Use backtick (`) for line continuation instead of backslash (\\)
 
 ---
 
-## 詳細部署步驟
+## Detailed Deployment Steps
 
-### Step 1: 啟動 Minikube
+### Step 1: Start Minikube
 
 ```bash
-# 啟動 Minikube 並配置資源
+# Start with resource configuration
 minikube start --cpus 4 --memory 12288 --driver=docker
 
-# 驗證 Minikube 狀態
+# Verify status
 minikube status
 
-# 啟用 Ingress Controller
+# Enable required addons
 minikube addons enable ingress
+minikube addons enable metrics-server  # Optional, for resource monitoring
 ```
 
-### Step 2: 配置 Docker 環境
+### Step 2: Configure Docker Environment
 
+**Linux/macOS:**
 ```bash
-# 指向 Minikube 的 Docker daemon (每次開新 terminal 都需要執行)
 eval $(minikube docker-env)
 
-# 驗證設定
+# Verify (should show minikube)
 docker info | grep "Name:"
 ```
 
-### Step 3: Build Docker Images
+**Windows (PowerShell):**
+```powershell
+minikube docker-env | Invoke-Expression
 
-```bash
-# 從專案根目錄執行
-cd /path/to/double-entry-ledger
-
-# Build ledger-core
-docker build -t ledger-core:local -f apps/core/Dockerfile .
-
-# Build ledger-gateway
-docker build -t ledger-gateway:local -f apps/gateway/Dockerfile .
-
-# Build ledger-audit
-docker build -t ledger-audit:local -f apps/audit/Dockerfile .
-
-# 驗證 images
-docker images | grep ledger
+# Verify (should show minikube)
+docker info | findstr "Name:"
 ```
 
-### Step 4: 建立 Namespace 和 Secrets
+> **Note**: You need to run this command each time you open a new terminal
+
+> **Alternative for Windows**: If images are built on Docker Desktop separately, load them into Minikube:
+> ```powershell
+> minikube image load ledger-core:local
+> minikube image load ledger-gateway:local
+> minikube image load ledger-audit:local
+> ```
+
+### Step 3: Create Namespace and Secrets
 
 ```bash
-# 建立 namespace
+# Create namespace
 kubectl apply -f deploy/k8s/infra/namespace.yaml
 
-# 建立 secrets
+# Create secrets (contains database passwords and other sensitive info)
 kubectl apply -f deploy/k8s/secrets/secrets.yaml
 
-# 驗證
+# Verify
 kubectl get ns ledger-dev
 kubectl get secrets -n ledger-dev
 ```
 
-### Step 5: 安裝基礎設施服務 (Helm)
+### Step 4: Install Infrastructure Services
+
+#### 4.1 Add Helm Repos
 
 ```bash
-# 添加 Helm repos
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add elastic https://helm.elastic.co
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
+```
 
-# 安裝 PostgreSQL
-helm install postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
-  -f deploy/k8s/infra/helm-values/postgresql-values.yaml \
-  -n ledger-dev
+#### 4.2 Install Prometheus (First - provides CRDs for ServiceMonitor)
 
-# 安裝 Redis
-helm install redis oci://registry-1.docker.io/bitnamicharts/redis \
-  -f deploy/k8s/infra/helm-values/redis-values.yaml \
-  -n ledger-dev
-
-# 安裝 Kafka
-helm install kafka oci://registry-1.docker.io/bitnamicharts/kafka \
-  -f deploy/k8s/infra/helm-values/kafka-values.yaml \
-  -n ledger-dev
-
-# 安裝 Elasticsearch
-helm install elasticsearch elastic/elasticsearch \
-  -f deploy/k8s/infra/helm-values/elasticsearch-values.yaml \
-  -n ledger-dev
-
-# 安裝 Kibana
-helm install kibana elastic/kibana \
-  -f deploy/k8s/infra/helm-values/kibana-values.yaml \
-  -n ledger-dev
-
-# 安裝 Prometheus (精簡版)
+```bash
 helm install prometheus prometheus-community/kube-prometheus-stack \
   -f deploy/k8s/infra/helm-values/prometheus-values.yaml \
   -n ledger-dev
 
-# 等待所有 pods 就緒
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=postgresql -n ledger-dev --timeout=300s
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=redis -n ledger-dev --timeout=300s
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kafka -n ledger-dev --timeout=300s
+# Wait for ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=prometheus \
+  -n ledger-dev --timeout=300s
 ```
 
-### Step 6: 部署微服務 (Kustomize)
+> **Important**: Install Prometheus first because it provides the `ServiceMonitor` CRDs that other Helm charts (PostgreSQL, Redis) may require
+
+#### 4.3 Install PostgreSQL
 
 ```bash
-# 部署 ledger-core
+helm install postgresql oci://registry-1.docker.io/bitnamicharts/postgresql \
+  -f deploy/k8s/infra/helm-values/postgresql-values.yaml \
+  -n ledger-dev
+
+# Wait for ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=postgresql \
+  -n ledger-dev --timeout=300s
+```
+
+#### 4.4 Install Redis
+
+```bash
+helm install redis oci://registry-1.docker.io/bitnamicharts/redis \
+  -f deploy/k8s/infra/helm-values/redis-values.yaml \
+  -n ledger-dev
+
+# Wait for ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=redis \
+  -n ledger-dev --timeout=300s
+```
+
+#### 4.5 Install Kafka
+
+Deploy Apache Kafka 4.0.0 (KRaft mode) using custom Kustomize manifests:
+
+```bash
+kubectl apply -k deploy/k8s/infra/kafka
+
+# Wait for ready
+kubectl wait --for=condition=ready pod -l app=kafka \
+  -n ledger-dev --timeout=300s
+```
+
+> **Note**: We use the official Apache `apache/kafka:4.0.0` image since Bitnami Kafka images may not be available from Docker Hub
+
+#### 4.6 Install Elasticsearch
+
+```bash
+helm install elasticsearch elastic/elasticsearch \
+  -f deploy/k8s/infra/helm-values/elasticsearch-values.yaml \
+  -n ledger-dev
+
+# Wait for ready (Elasticsearch takes longer to start)
+kubectl wait --for=condition=ready pod -l app=ledger-cluster-master \
+  -n ledger-dev --timeout=600s
+```
+
+### Step 5: Build and Deploy Applications
+
+#### 5.1 Build Docker Images
+
+```bash
+# Make sure you're in the project root directory
+cd /path/to/double-entry-ledger
+
+# Build all services
+docker build -t ledger-core:local -f apps/core/Dockerfile .
+docker build -t ledger-gateway:local -f apps/gateway/Dockerfile .
+docker build -t ledger-audit:local -f apps/audit/Dockerfile .
+
+# Verify
+# Linux/macOS:
+docker images | grep ledger
+# Windows (PowerShell):
+docker images | findstr ledger
+```
+
+#### 5.2 Deploy Microservices (Kustomize)
+
+```bash
+# Deploy core services
 kubectl apply -k deploy/k8s/apps/ledger-core/overlays/dev
-
-# 部署 ledger-gateway
 kubectl apply -k deploy/k8s/apps/ledger-gateway/overlays/dev
-
-# 部署 ledger-audit
 kubectl apply -k deploy/k8s/apps/ledger-audit/overlays/dev
 
-# 部署 Kafka UI
+# Deploy Kafka UI (optional)
 kubectl apply -k deploy/k8s/apps/kafka-ui/overlays/dev
 
-# 部署 Ingress
+# Deploy Ingress
 kubectl apply -f deploy/k8s/ingress/ingress.yaml
 ```
 
-### Step 7: 設定本機 DNS
+### Step 6: Configure Local DNS
 
+First, get Minikube IP:
 ```bash
-# 取得 Minikube IP
 minikube ip
-
-# 編輯 hosts 檔案 (Windows: C:\Windows\System32\drivers\etc\hosts)
-# 添加以下內容 (替換 <MINIKUBE_IP> 為實際 IP):
-# <MINIKUBE_IP> api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local
 ```
+
+**Linux/macOS:**
+```bash
+# Add to hosts file (replace <MINIKUBE_IP> with actual IP)
+echo "<MINIKUBE_IP> api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local" | sudo tee -a /etc/hosts
+
+# Verify
+cat /etc/hosts
+```
+
+**Windows (CMD as Administrator):**
+```cmd
+:: Add to hosts file (replace <MINIKUBE_IP> with actual IP)
+echo <MINIKUBE_IP> api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local >> C:\Windows\System32\drivers\etc\hosts
+
+:: Verify
+type C:\Windows\System32\drivers\etc\hosts
+```
+
+**Windows (Manual Edit):**
+1. Open Notepad as Administrator
+2. Open file: `C:\Windows\System32\drivers\etc\hosts`
+3. Add line: `<MINIKUBE_IP> api.ledger.local kafka.ledger.local kibana.ledger.local prometheus.ledger.local`
+4. Save file
 
 ---
 
-## 服務存取
+## Accessing Services
 
-### 透過 Ingress 存取
+### Via Ingress
 
-| 服務 | URL |
-|-----|-----|
-| API Gateway | http://api.ledger.local |
-| Kafka UI | http://kafka.ledger.local |
-| Kibana | http://kibana.ledger.local |
-| Prometheus | http://prometheus.ledger.local |
+> **Windows Important**: You must run `minikube tunnel` in a separate Administrator terminal for Ingress to work on Windows.
+> ```powershell
+> # Run in separate Administrator PowerShell (keep it running)
+> minikube tunnel
+> ```
 
-### 透過 Port Forward 存取
+| Service | URL | Description |
+|---------|-----|-------------|
+| API Gateway | http://api.ledger.local | REST API endpoint |
+| Kafka UI | http://kafka.ledger.local | Kafka management interface |
+| Kibana | http://kibana.ledger.local | Log query interface |
+| Prometheus | http://prometheus.ledger.local | Metrics & monitoring |
+
+### Testing API
+
+**Linux/macOS:**
+```bash
+curl http://api.ledger.local/health
+```
+
+**Windows (PowerShell):**
+```powershell
+# Use curl.exe to avoid PowerShell alias issues
+curl.exe http://api.ledger.local/health
+
+# Or use Invoke-RestMethod
+Invoke-RestMethod http://api.ledger.local/health
+```
+
+### Via Port Forward
 
 ```bash
-# API Gateway
+# API Gateway (HTTP)
 kubectl port-forward svc/ledger-gateway 8081:8081 -n ledger-dev
+
+# Core Service (gRPC)
+kubectl port-forward svc/ledger-core 9098:9098 -n ledger-dev
 
 # Kafka UI
 kubectl port-forward svc/kafka-ui 8090:8080 -n ledger-dev
@@ -219,127 +450,277 @@ kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 -n ledg
 
 # PostgreSQL (for debugging)
 kubectl port-forward svc/postgresql 5432:5432 -n ledger-dev
+
+# Redis (for debugging)
+kubectl port-forward svc/redis-master 6379:6379 -n ledger-dev
+```
+
+---
+
+## K8s Service Connection Info
+
+### Internal DNS Reference
+
+| Service | DNS (Full) | DNS (Short) | Port |
+|---------|-----------|-------------|------|
+| PostgreSQL | `postgresql.ledger-dev.svc.cluster.local` | `postgresql` | 5432 |
+| Redis | `redis-master.ledger-dev.svc.cluster.local` | `redis-master` | 6379 |
+| Kafka | `kafka.ledger-dev.svc.cluster.local` | `kafka` | 9092 |
+| Elasticsearch | `ledger-cluster-master.ledger-dev.svc.cluster.local` | `ledger-cluster-master` | 9200 |
+| Prometheus | `prometheus-kube-prometheus-prometheus.ledger-dev.svc.cluster.local` | `prometheus-kube-prometheus-prometheus` | 9090 |
+| ledger-core | `ledger-core.ledger-dev.svc.cluster.local` | `ledger-core` | 8080, 9098 |
+| ledger-gateway | `ledger-gateway.ledger-dev.svc.cluster.local` | `ledger-gateway` | 8081 |
+
+### Connection String Examples
+
+```yaml
+# PostgreSQL
+jdbc:postgresql://postgresql:5432/ledger_db
+
+# Redis
+redis://redis-master:6379
+
+# Kafka
+kafka:9092
+
+# Elasticsearch
+http://ledger-cluster-master:9200
+
+# Prometheus
+http://prometheus-kube-prometheus-prometheus:9090
 ```
 
 ---
 
 ## ArgoCD GitOps
 
-### 安裝 ArgoCD
+### GitOps Workflow
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub
+    participant Argo as ArgoCD
+    participant K8s as Kubernetes
+
+    Dev->>GH: Push code
+    Dev->>GH: Update Kustomize overlay
+    GH-->>Argo: Webhook notification
+    Argo->>GH: Pull latest config
+    Argo->>Argo: Compare diff
+    Argo->>K8s: Sync deployment
+    K8s-->>Argo: Report status
+```
+
+### Install ArgoCD
 
 ```bash
-# 建立 argocd namespace
+# Create namespace
 kubectl create namespace argocd
 
-# 安裝 ArgoCD
+# Install ArgoCD
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# 等待安裝完成
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
+# Wait for installation
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server \
+  -n argocd --timeout=300s
 
-# 取得初始密碼
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+# Get initial password
+# Linux/macOS:
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d && echo
 
 # Port forward ArgoCD UI
 kubectl port-forward svc/argocd-server 8443:443 -n argocd
-# 訪問 https://localhost:8443，用戶名: admin
 ```
 
-### 部署 ArgoCD Applications
+**Windows (PowerShell) - Get initial password:**
+```powershell
+$secret = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($secret))
+```
+
+Access https://localhost:8443, username: `admin`
+
+### Deploy Applications
 
 ```bash
-# 建立 ArgoCD Project
+# Create ArgoCD Project
 kubectl apply -f deploy/k8s/argocd/project.yaml
 
-# 部署應用程式
+# Deploy all applications
 kubectl apply -f deploy/k8s/argocd/applications/
 ```
 
-### GitOps 工作流程
-
-1. 修改程式碼並 push 到 GitHub
-2. 更新 image tag 在 Kustomize overlay
-3. ArgoCD 自動檢測變更並同步
-
 ---
 
-## 故障排除
+## Troubleshooting
 
-### 常見問題
+### Diagnostic Workflow
 
-#### 1. Pod 處於 Pending 狀態
-```bash
-# 檢查事件
-kubectl describe pod <pod-name> -n ledger-dev
+```mermaid
+flowchart TD
+    A[Pod Issue] --> B{Check Status}
+    B -->|Pending| C[Check Resources/PVC]
+    B -->|ImagePullBackOff| D[Check Docker Environment]
+    B -->|CrashLoopBackOff| E[Check Logs]
+    B -->|Running but unreachable| F[Check Service/Endpoints]
 
-# 常見原因: 資源不足
-# 解決方案: 增加 Minikube 資源或降低服務資源限制
+    C --> C1[kubectl describe pod]
+    D --> D1[eval minikube docker-env]
+    E --> E1[kubectl logs pod]
+    F --> F1[kubectl get endpoints]
 ```
 
-#### 2. ImagePullBackOff 錯誤
-```bash
-# 確認已執行 eval $(minikube docker-env)
-# 確認 imagePullPolicy: Never
+### Common Issues
 
-# 重新 build image
+#### 1. Pod in Pending State
+
+```bash
+# Check reason
+kubectl describe pod <pod-name> -n ledger-dev
+
+# Common causes and solutions:
+# - Insufficient resources: Increase Minikube resources or reduce service limits
+# - PVC cannot bind: Check StorageClass
+```
+
+#### 2. ImagePullBackOff Error
+
+**Linux/macOS:**
+```bash
+# Ensure Minikube Docker environment is configured
+eval $(minikube docker-env)
+
+# Ensure imagePullPolicy: Never in Deployment
+# Rebuild image
 docker build -t <image>:local -f <Dockerfile> .
 ```
 
-#### 3. CrashLoopBackOff 錯誤
+**Windows (PowerShell):**
+```powershell
+# Ensure Minikube Docker environment is configured
+minikube docker-env | Invoke-Expression
+
+# Rebuild image
+docker build -t <image>:local -f <Dockerfile> .
+
+# Alternative: Load existing images into Minikube
+minikube image load <image>:local
+```
+
+#### 3. CrashLoopBackOff Error
+
 ```bash
-# 查看 logs
+# View current logs
 kubectl logs <pod-name> -n ledger-dev
 
-# 查看之前的容器 logs
+# View previous container logs
 kubectl logs <pod-name> -n ledger-dev --previous
+
+# Check environment variables and config
+kubectl describe pod <pod-name> -n ledger-dev
 ```
 
-#### 4. 服務無法連接
+#### 4. Service Unreachable
+
 ```bash
-# 檢查 service endpoints
+# Check service endpoints
 kubectl get endpoints -n ledger-dev
 
-# 檢查 DNS 解析
-kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup postgresql.ledger-dev.svc.cluster.local
+# Check DNS resolution
+kubectl run -it --rm debug --image=busybox --restart=Never \
+  -- nslookup postgresql.ledger-dev.svc.cluster.local
+
+# Test connection
+kubectl run -it --rm debug --image=busybox --restart=Never \
+  -- nc -zv postgresql 5432
 ```
 
-### 有用的指令
+### Useful Commands
 
 ```bash
-# 查看所有資源
+# View all resources
 kubectl get all -n ledger-dev
 
-# 查看 pod logs
+# View pod logs (streaming)
 kubectl logs -f deployment/ledger-core -n ledger-dev
 
-# 進入 pod shell
+# Enter pod shell
 kubectl exec -it deployment/ledger-core -n ledger-dev -- /bin/sh
 
-# 刪除並重新部署
+# Restart deployment
+kubectl rollout restart deployment/ledger-core -n ledger-dev
+
+# Delete and redeploy
 kubectl delete -k deploy/k8s/apps/ledger-core/overlays/dev
 kubectl apply -k deploy/k8s/apps/ledger-core/overlays/dev
 
-# 清理所有資源
+# View Helm releases
+helm list -n ledger-dev
+
+# View resource usage (requires metrics-server)
+kubectl top pods -n ledger-dev
+```
+
+### Cleanup
+
+```bash
+# Delete applications
+kubectl delete -k deploy/k8s/apps/ledger-core/overlays/dev
+kubectl delete -k deploy/k8s/apps/ledger-gateway/overlays/dev
+kubectl delete -k deploy/k8s/apps/ledger-audit/overlays/dev
+
+# Delete infrastructure
+helm uninstall prometheus -n ledger-dev
+helm uninstall elasticsearch -n ledger-dev
+kubectl delete -k deploy/k8s/infra/kafka
+helm uninstall redis -n ledger-dev
+helm uninstall postgresql -n ledger-dev
+
+# Delete namespace (removes all resources)
 kubectl delete ns ledger-dev
-helm uninstall postgresql redis kafka elasticsearch kibana prometheus -n ledger-dev
+
+# Stop Minikube
+minikube stop
+
+# Completely delete Minikube cluster
+minikube delete
 ```
 
 ---
 
-## K8s DNS 服務對照表
+## Directory Structure
 
-| 服務 | Kubernetes DNS | Port |
-|-----|----------------|------|
-| PostgreSQL | postgresql.ledger-dev.svc.cluster.local | 5432 |
-| Redis | redis-master.ledger-dev.svc.cluster.local | 6379 |
-| Kafka | kafka.ledger-dev.svc.cluster.local | 9092 |
-| Elasticsearch | elasticsearch-master.ledger-dev.svc.cluster.local | 9200 |
-| ledger-core | ledger-core.ledger-dev.svc.cluster.local | 8080 (HTTP), 9098 (gRPC) |
-| ledger-gateway | ledger-gateway.ledger-dev.svc.cluster.local | 8081 |
-
-**簡短形式** (同一 namespace 內):
-- `postgresql:5432`
-- `redis-master:6379`
-- `kafka:9092`
-- `elasticsearch-master:9200`
-- `ledger-core:9098`
+```
+deploy/k8s/
+├── README.md                    # This file
+├── infra/
+│   ├── namespace.yaml           # Namespace definition
+│   ├── helm-values/             # Helm values configuration
+│   │   ├── postgresql-values.yaml
+│   │   ├── redis-values.yaml
+│   │   ├── kafka-values.yaml    # (unused, using Kustomize instead)
+│   │   ├── elasticsearch-values.yaml
+│   │   ├── kibana-values.yaml
+│   │   └── prometheus-values.yaml
+│   └── kafka/                   # Kafka Kustomize manifests
+│       ├── kustomization.yaml
+│       ├── kafka-configmap.yaml
+│       ├── kafka-service.yaml
+│       └── kafka-statefulset.yaml
+├── secrets/
+│   └── secrets.yaml             # Secrets (for development)
+├── apps/
+│   ├── ledger-core/
+│   │   ├── base/                # Base configuration
+│   │   └── overlays/dev/        # Development overlay
+│   ├── ledger-gateway/
+│   ├── ledger-audit/
+│   └── kafka-ui/
+├── ingress/
+│   └── ingress.yaml             # Ingress rules
+└── argocd/
+    ├── project.yaml             # ArgoCD Project
+    └── applications/            # ArgoCD Applications
+```

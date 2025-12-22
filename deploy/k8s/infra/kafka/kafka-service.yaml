@@ -1,0 +1,39 @@
+# Kafka Services - Development Environment
+---
+# Headless service for StatefulSet DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: ledger-dev
+  labels:
+    app: kafka
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: client
+      port: 9092
+      targetPort: 9092
+    - name: controller
+      port: 9093
+      targetPort: 9093
+  selector:
+    app: kafka
+---
+# ClusterIP service for client access
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: ledger-dev
+  labels:
+    app: kafka
+spec:
+  type: ClusterIP
+  ports:
+    - name: client
+      port: 9092
+      targetPort: 9092
+  selector:
+    app: kafka
