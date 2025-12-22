@@ -15,6 +15,8 @@ WORKDIR /app/apps/core
 
 # 確保 mvnw 有執行權限
 RUN chmod +x mvnw
+# Ensure LF line endings (safeguard for Windows developers)
+RUN sed -i 's/\r$//' mvnw
 
 # Step 2: Download dependencies using the Wrapper
 # 使用 ./mvnw 而不是 mvn

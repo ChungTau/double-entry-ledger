@@ -5,6 +5,7 @@ go 1.25.5
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.11.1
 	github.com/segmentio/kafka-go v0.4.49
+	github.com/shopspring/decimal v1.4.0
 )
 
 require (

@@ -3,16 +3,18 @@ package elasticsearch
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/chungtau/ledger-audit/internal/dlq"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
+	"github.com/shopspring/decimal"
 )
 
 // Client wraps the Elasticsearch client with audit-specific functionality
@@ -25,23 +27,26 @@ type Client struct {
 
 // Config holds Elasticsearch connection configuration
 type Config struct {
-	URL         string
-	Index       string
-	DLQProducer *dlq.Producer
+	URL          string
+	Index        string
+	Username     string
+	Password     string
+	SkipTLSVerify bool
+	DLQProducer  *dlq.Producer
 }
 
 // TransactionDocument represents the document to be indexed
 type TransactionDocument struct {
-	TransactionID  string    `json:"transactionId"`
-	IdempotencyKey string    `json:"idempotencyKey"`
-	FromAccountID  string    `json:"fromAccountId"`
-	ToAccountID    string    `json:"toAccountId"`
-	Amount         float64   `json:"amount"`
-	AmountRaw      string    `json:"amountRaw"`
-	Currency       string    `json:"currency"`
-	Status         string    `json:"status"`
-	BookedAt       string    `json:"bookedAt"`
-	IndexedAt      time.Time `json:"indexedAt"`
+	TransactionID  string          `json:"transactionId"`
+	IdempotencyKey string          `json:"idempotencyKey"`
+	FromAccountID  string          `json:"fromAccountId"`
+	ToAccountID    string          `json:"toAccountId"`
+	Amount         decimal.Decimal `json:"amount"`
+	AmountRaw      string          `json:"amountRaw"`
+	Currency       string          `json:"currency"`
+	Status         string          `json:"status"`
+	BookedAt       string          `json:"bookedAt"`
+	IndexedAt      time.Time       `json:"indexedAt"`
 }
 
 // Index mapping for transactions
@@ -72,9 +77,18 @@ const indexMapping = `{
 // NewClient creates a new Elasticsearch client wrapper
 func NewClient(cfg Config) (*Client, error) {
 	esCfg := elasticsearch.Config{
-		Addresses: []string{cfg.URL},
+		Addresses:     []string{cfg.URL},
+		Username:      cfg.Username,
+		Password:      cfg.Password,
 		RetryOnStatus: []int{502, 503, 504, 429},
 		MaxRetries:    3,
+	}
+
+	// Skip TLS verification for dev environment
+	if cfg.SkipTLSVerify {
+		esCfg.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
 	}
 
 	es, err := elasticsearch.NewClient(esCfg)
@@ -163,8 +177,8 @@ func (c *Client) IndexTransaction(ctx context.Context, doc TransactionDocument, 
 	// Add indexing timestamp
 	doc.IndexedAt = time.Now().UTC()
 
-	// Parse amount from string to float64
-	if amount, err := strconv.ParseFloat(doc.AmountRaw, 64); err == nil {
+	// Parse amount from string to decimal.Decimal (avoids float64 precision issues)
+	if amount, err := decimal.NewFromString(doc.AmountRaw); err == nil {
 		doc.Amount = amount
 	}
 

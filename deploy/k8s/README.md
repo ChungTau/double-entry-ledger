@@ -156,7 +156,7 @@ helm install redis oci://registry-1.docker.io/bitnamicharts/redis \
   -f deploy/k8s/infra/helm-values/redis-values.yaml -n ledger-dev
 kubectl apply -k deploy/k8s/infra/kafka
 helm install elasticsearch elastic/elasticsearch \
-  -f deploy/k8s/infra/helm-values/elasticsearch-values.yaml -n ledger-dev
+  -f deploy/k8s/infra/helm-values/es-dev-values.yaml -n ledger-dev
 
 # 6. Verify Installation
 kubectl get pods -n ledger-dev
@@ -187,7 +187,7 @@ helm install redis oci://registry-1.docker.io/bitnamicharts/redis `
   -f deploy/k8s/infra/helm-values/redis-values.yaml -n ledger-dev
 kubectl apply -k deploy/k8s/infra/kafka
 helm install elasticsearch elastic/elasticsearch `
-  -f deploy/k8s/infra/helm-values/elasticsearch-values.yaml -n ledger-dev
+  -f deploy/k8s/infra/helm-values/es-dev-values.yaml -n ledger-dev
 
 # 6. Verify Installation
 kubectl get pods -n ledger-dev
@@ -323,13 +323,15 @@ kubectl wait --for=condition=ready pod -l app=kafka \
 
 ```bash
 helm install elasticsearch elastic/elasticsearch \
-  -f deploy/k8s/infra/helm-values/elasticsearch-values.yaml \
+  -f deploy/k8s/infra/helm-values/es-dev-values.yaml \
   -n ledger-dev
 
 # Wait for ready (Elasticsearch takes longer to start)
-kubectl wait --for=condition=ready pod -l app=ledger-cluster-master \
+kubectl wait --for=condition=ready pod/elasticsearch-master-0 \
   -n ledger-dev --timeout=600s
 ```
+
+> **Note**: Elasticsearch is deployed with security enabled (HTTPS + Basic Auth). The `ledger-audit` service automatically reads credentials from the `elasticsearch-master-credentials` secret.
 
 ### Step 5: Build and Deploy Applications
 
@@ -472,7 +474,7 @@ kubectl port-forward svc/redis-master 6379:6379 -n ledger-dev
 | PostgreSQL | `postgresql.ledger-dev.svc.cluster.local` | `postgresql` | 5432 |
 | Redis | `redis-master.ledger-dev.svc.cluster.local` | `redis-master` | 6379 |
 | Kafka | `kafka.ledger-dev.svc.cluster.local` | `kafka` | 9092 |
-| Elasticsearch | `ledger-cluster-master.ledger-dev.svc.cluster.local` | `ledger-cluster-master` | 9200 |
+| Elasticsearch | `elasticsearch-master.ledger-dev.svc.cluster.local` | `elasticsearch-master` | 9200 (HTTPS) |
 | Prometheus | `prometheus-kube-prometheus-prometheus.ledger-dev.svc.cluster.local` | `prometheus-kube-prometheus-prometheus` | 9090 |
 | ledger-core | `ledger-core.ledger-dev.svc.cluster.local` | `ledger-core` | 8080, 9098 |
 | ledger-gateway | `ledger-gateway.ledger-dev.svc.cluster.local` | `ledger-gateway` | 8081 |
@@ -489,8 +491,10 @@ redis://redis-master:6379
 # Kafka
 kafka:9092
 
-# Elasticsearch
-http://ledger-cluster-master:9200
+# Elasticsearch (with authentication)
+# URL: https://elasticsearch-master:9200
+# Username: elastic
+# Password: kubectl get secret elasticsearch-master-credentials -n ledger-dev -o jsonpath='{.data.password}' | base64 -d
 
 # Prometheus
 http://prometheus-kube-prometheus-prometheus:9090
@@ -706,7 +710,7 @@ deploy/k8s/
 │   ├── helm-values/             # Helm values configuration
 │   │   ├── postgresql-values.yaml
 │   │   ├── redis-values.yaml
-│   │   ├── elasticsearch-values.yaml
+│   │   ├── es-dev-values.yaml   # Elasticsearch (elastic/elasticsearch chart)
 │   │   ├── kibana-values.yaml
 │   │   └── prometheus-values.yaml
 │   └── kafka/                   # Kafka Kustomize manifests

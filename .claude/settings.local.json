@@ -32,7 +32,27 @@
       "Bash(kubectl get:*)",
       "Bash(kubectl logs:*)",
       "Bash(helm list:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(helm show chart:*)",
+      "Bash(helm get values:*)",
+      "Bash(helm uninstall:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(kubectl wait:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(minikube docker-env:*)",
+      "Bash($env:DOCKER_TLS_VERIFY=\"1\")",
+      "Bash($env:DOCKER_HOST=\"tcp://127.0.0.1:47960\")",
+      "Bash($env:DOCKER_CERT_PATH=\"C:\\\\Users\\\\Edward\\\\.minikube\\\\certs\")",
+      "Bash(docker build:*)",
+      "Bash(minikube image load:*)",
+      "Bash(kubectl patch:*)",
+      "Bash(minikube image build:*)",
+      "Bash(kubectl set image:*)",
+      "Bash(git config:*)",
+      "Bash(test:*)",
+      "Bash(git check-attr:*)",
+      "Bash(go mod tidy:*)"
     ]
   }
 }

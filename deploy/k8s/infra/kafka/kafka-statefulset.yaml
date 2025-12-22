@@ -1,5 +1,18 @@
-# Kafka StatefulSet - Development Environment
-# Uses Apache Kafka 4.0.0 with KRaft mode
+# ============================================================
+# Kafka StatefulSet - DEVELOPMENT ONLY
+# ============================================================
+# This is a manually managed Kafka 4.0 KRaft mode deployment
+# for learning and development purposes.
+#
+# For production, consider migrating to:
+#   - Strimzi Kafka Operator: https://strimzi.io
+#   - Bitnami Kafka Helm Chart: https://github.com/bitnami/charts
+#
+# Current limitations:
+#   - Single replica (no HA)
+#   - PLAINTEXT only (no TLS/SASL)
+#   - Basic resource limits
+# ============================================================
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

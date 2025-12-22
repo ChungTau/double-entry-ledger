@@ -26,6 +26,9 @@ func main() {
 
 	esURL := getEnv("ELASTICSEARCH_URL", "http://localhost:9200")
 	esIndex := getEnv("ELASTICSEARCH_INDEX", "transactions")
+	esUsername := getEnv("ELASTICSEARCH_USERNAME", "")
+	esPassword := getEnv("ELASTICSEARCH_PASSWORD", "")
+	esSkipTLS := getEnv("ELASTICSEARCH_SKIP_TLS_VERIFY", "false") == "true"
 
 	log.Printf("Starting Audit Service. Broker: %s, Topic: %s", brokerAddress, topic)
 	log.Printf("Elasticsearch: %s, Index: %s", esURL, esIndex)
@@ -38,9 +41,12 @@ func main() {
 	var err error
 	for i := 0; i < 10; i++ {
 		esClient, err = elasticsearch.NewClient(elasticsearch.Config{
-			URL:         esURL,
-			Index:       esIndex,
-			DLQProducer: dlqProducer,
+			URL:           esURL,
+			Index:         esIndex,
+			Username:      esUsername,
+			Password:      esPassword,
+			SkipTLSVerify: esSkipTLS,
+			DLQProducer:   dlqProducer,
 		})
 		if err == nil {
 			break
