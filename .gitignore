@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# Kubernetes secrets (use secrets.yaml.example as template)
+deploy/k8s/secrets/secrets.yaml
+
 # IDE
 .idea/
 .vscode/

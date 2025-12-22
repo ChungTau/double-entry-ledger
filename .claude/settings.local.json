@@ -48,7 +48,11 @@
       "Bash(minikube image load:*)",
       "Bash(kubectl patch:*)",
       "Bash(minikube image build:*)",
-      "Bash(kubectl set image:*)"
+      "Bash(kubectl set image:*)",
+      "Bash(git config:*)",
+      "Bash(test:*)",
+      "Bash(git check-attr:*)",
+      "Bash(go mod tidy:*)"
     ]
   }
 }

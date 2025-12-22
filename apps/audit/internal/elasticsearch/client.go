@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/chungtau/ledger-audit/internal/dlq"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
+	"github.com/shopspring/decimal"
 )
 
 // Client wraps the Elasticsearch client with audit-specific functionality
@@ -37,16 +37,16 @@ type Config struct {
 
 // TransactionDocument represents the document to be indexed
 type TransactionDocument struct {
-	TransactionID  string    `json:"transactionId"`
-	IdempotencyKey string    `json:"idempotencyKey"`
-	FromAccountID  string    `json:"fromAccountId"`
-	ToAccountID    string    `json:"toAccountId"`
-	Amount         float64   `json:"amount"`
-	AmountRaw      string    `json:"amountRaw"`
-	Currency       string    `json:"currency"`
-	Status         string    `json:"status"`
-	BookedAt       string    `json:"bookedAt"`
-	IndexedAt      time.Time `json:"indexedAt"`
+	TransactionID  string          `json:"transactionId"`
+	IdempotencyKey string          `json:"idempotencyKey"`
+	FromAccountID  string          `json:"fromAccountId"`
+	ToAccountID    string          `json:"toAccountId"`
+	Amount         decimal.Decimal `json:"amount"`
+	AmountRaw      string          `json:"amountRaw"`
+	Currency       string          `json:"currency"`
+	Status         string          `json:"status"`
+	BookedAt       string          `json:"bookedAt"`
+	IndexedAt      time.Time       `json:"indexedAt"`
 }
 
 // Index mapping for transactions
@@ -177,8 +177,8 @@ func (c *Client) IndexTransaction(ctx context.Context, doc TransactionDocument, 
 	// Add indexing timestamp
 	doc.IndexedAt = time.Now().UTC()
 
-	// Parse amount from string to float64
-	if amount, err := strconv.ParseFloat(doc.AmountRaw, 64); err == nil {
+	// Parse amount from string to decimal.Decimal (avoids float64 precision issues)
+	if amount, err := decimal.NewFromString(doc.AmountRaw); err == nil {
 		doc.Amount = amount
 	}
 
