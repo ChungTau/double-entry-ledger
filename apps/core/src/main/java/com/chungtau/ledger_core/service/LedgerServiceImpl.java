@@ -4,13 +4,21 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chungtau.ledger.grpc.v1.AccountResponse;
 import com.chungtau.ledger.grpc.v1.BalanceResponse;
+import com.chungtau.ledger.grpc.v1.CreateAccountRequest;
 import com.chungtau.ledger.grpc.v1.CreateTransactionRequest;
 import com.chungtau.ledger.grpc.v1.GetBalanceRequest;
 import com.chungtau.ledger.grpc.v1.LedgerServiceGrpc;
+import com.chungtau.ledger.grpc.v1.ListAccountsRequest;
+import com.chungtau.ledger.grpc.v1.ListAccountsResponse;
 import com.chungtau.ledger.grpc.v1.TransactionResponse;
+import com.chungtau.ledger_core.config.DataInitializer;
 import com.chungtau.ledger_core.entity.Account;
 import com.chungtau.ledger_core.entity.Transaction;
 import com.chungtau.ledger.grpc.v1.TransactionCreatedEvent;
@@ -35,6 +43,8 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
     private final OutboxEventService outboxEventService;
 
     private static final String TOPIC_TRANSACTION_CREATED = "transaction-events";
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
     /**
      * Handles money transfer requests between accounts with full ACID compliance.
      * 
@@ -236,6 +246,181 @@ public class LedgerServiceImpl extends LedgerServiceGrpc.LedgerServiceImplBase {
             log.error("Error fetching balance", e);
             responseObserver.onError(Status.INTERNAL
                 .withDescription("Failed to fetch balance")
+                .asRuntimeException());
+        }
+    }
+
+    /**
+     * Creates a new account for a user with optional initial balance.
+     * If initial_balance > 0, a Genesis transaction is created from the system
+     * Equity account to maintain double-entry bookkeeping compliance.
+     */
+    @Override
+    @Transactional
+    public void createAccount(CreateAccountRequest request, StreamObserver<AccountResponse> responseObserver) {
+        try {
+            // 1. Validate user_id
+            if (request.getUserId() == null || request.getUserId().isBlank()) {
+                throw new IllegalArgumentException("User ID is required");
+            }
+
+            // 2. Validate currency (exactly 3 characters)
+            if (request.getCurrency() == null || request.getCurrency().length() != 3) {
+                throw new IllegalArgumentException("Currency must be exactly 3 characters");
+            }
+
+            // 3. Parse initial_balance (default to 0 if empty)
+            BigDecimal initialBalance = BigDecimal.ZERO;
+            if (request.getInitialBalance() != null && !request.getInitialBalance().isBlank()) {
+                try {
+                    initialBalance = new BigDecimal(request.getInitialBalance());
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Invalid initial balance format");
+                }
+            }
+
+            // 4. Validate initial_balance >= 0
+            if (initialBalance.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Initial balance cannot be negative");
+            }
+
+            // 5. Create account with balance = 0 initially
+            Account newAccount = Account.builder()
+                .userId(request.getUserId())
+                .currency(request.getCurrency().toUpperCase())
+                .balance(BigDecimal.ZERO)
+                .build();
+
+            // 6. Save account
+            Account savedAccount = accountRepository.save(newAccount);
+            log.info("Created new account: {} for user: {}",
+                LogMaskingUtil.maskUuid(savedAccount.getId().toString()),
+                LogMaskingUtil.mask(request.getUserId()));
+
+            // 7. If initial_balance > 0, create Genesis transaction
+            if (initialBalance.compareTo(BigDecimal.ZERO) > 0) {
+                createGenesisTransaction(savedAccount, initialBalance);
+            }
+
+            // 8. Build and return response
+            AccountResponse response = AccountResponse.newBuilder()
+                .setAccountId(savedAccount.getId().toString())
+                .setUserId(savedAccount.getUserId())
+                .setCurrency(savedAccount.getCurrency())
+                .setBalance(savedAccount.getBalance().toString())
+                .setVersion(savedAccount.getVersion() != null ? savedAccount.getVersion() : 0L)
+                .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+
+        } catch (IllegalArgumentException e) {
+            log.error("Validation failed for createAccount: {}", e.getMessage());
+            responseObserver.onError(Status.INVALID_ARGUMENT
+                .withDescription(e.getMessage())
+                .asRuntimeException());
+        } catch (Exception e) {
+            log.error("Internal error during account creation", e);
+            responseObserver.onError(Status.INTERNAL
+                .withDescription("Failed to create account")
+                .asRuntimeException());
+        }
+    }
+
+    /**
+     * Creates a Genesis transaction to fund the new account from system Equity account.
+     * This maintains double-entry bookkeeping compliance for opening balances.
+     */
+    private void createGenesisTransaction(Account targetAccount, BigDecimal amount) {
+        String currency = targetAccount.getCurrency();
+
+        // Find the system equity account for this currency
+        Account equityAccount = accountRepository
+            .findByUserIdAndCurrency(DataInitializer.SYSTEM_USER_ID, currency)
+            .orElseThrow(() -> {
+                log.error("System Equity account not found for currency: {}", currency);
+                return new IllegalStateException("System Equity account not found for currency: " + currency);
+            });
+
+        // Create the Genesis transaction
+        String idempotencyKey = "genesis-" + targetAccount.getId().toString();
+
+        Transaction genesisTransaction = Transaction.createTransfer(
+            idempotencyKey,
+            "Opening Balance",
+            equityAccount,
+            targetAccount,
+            amount
+        );
+
+        // Update balances
+        equityAccount.setBalance(equityAccount.getBalance().subtract(amount));
+        targetAccount.setBalance(targetAccount.getBalance().add(amount));
+
+        accountRepository.save(equityAccount);
+        accountRepository.save(targetAccount);
+        transactionRepository.saveAndFlush(genesisTransaction);
+
+        log.info("Created Genesis transaction {} for account {} with amount {}",
+            LogMaskingUtil.maskUuid(genesisTransaction.getId().toString()),
+            LogMaskingUtil.maskUuid(targetAccount.getId().toString()),
+            amount);
+    }
+
+    /**
+     * Lists all accounts for a specific user with pagination support.
+     */
+    @Override
+    public void listAccounts(ListAccountsRequest request, StreamObserver<ListAccountsResponse> responseObserver) {
+        try {
+            // 1. Validate user_id
+            if (request.getUserId() == null || request.getUserId().isBlank()) {
+                throw new IllegalArgumentException("User ID is required");
+            }
+
+            // 2. Parse pagination parameters
+            int page = Math.max(0, request.getPage());
+            int pageSize = request.getPageSize();
+            if (pageSize <= 0) {
+                pageSize = DEFAULT_PAGE_SIZE;
+            } else if (pageSize > MAX_PAGE_SIZE) {
+                pageSize = MAX_PAGE_SIZE;
+            }
+
+            Pageable pageable = PageRequest.of(page, pageSize);
+
+            // 3. Query accounts
+            Page<Account> accountPage = accountRepository.findAllByUserId(request.getUserId(), pageable);
+
+            // 4. Build response
+            ListAccountsResponse.Builder responseBuilder = ListAccountsResponse.newBuilder()
+                .setTotalCount(accountPage.getTotalElements())
+                .setPage(page)
+                .setPageSize(pageSize);
+
+            for (Account account : accountPage.getContent()) {
+                AccountResponse accountResponse = AccountResponse.newBuilder()
+                    .setAccountId(account.getId().toString())
+                    .setUserId(account.getUserId())
+                    .setCurrency(account.getCurrency())
+                    .setBalance(account.getBalance().toString())
+                    .setVersion(account.getVersion() != null ? account.getVersion() : 0L)
+                    .build();
+                responseBuilder.addAccounts(accountResponse);
+            }
+
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+
+        } catch (IllegalArgumentException e) {
+            log.error("Validation failed for listAccounts: {}", e.getMessage());
+            responseObserver.onError(Status.INVALID_ARGUMENT
+                .withDescription(e.getMessage())
+                .asRuntimeException());
+        } catch (Exception e) {
+            log.error("Internal error during listing accounts", e);
+            responseObserver.onError(Status.INTERNAL
+                .withDescription("Failed to list accounts")
                 .asRuntimeException());
         }
     }
