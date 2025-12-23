@@ -11,8 +11,12 @@ option go_package = "github.com/chungtau/ledger-gateway/gen/proto/v1;ledgerv1";
 
 service LedgerService {
   rpc CreateTransaction (CreateTransactionRequest) returns (TransactionResponse);
-  
+
   rpc GetBalance (GetBalanceRequest) returns (BalanceResponse);
+
+  rpc CreateAccount (CreateAccountRequest) returns (AccountResponse);
+
+  rpc ListAccounts (ListAccountsRequest) returns (ListAccountsResponse);
 }
 
 message CreateTransactionRequest {
@@ -39,6 +43,34 @@ message BalanceResponse {
   string currency = 2;
   string balance = 3;
   int64 version = 4;
+}
+
+// Account CRUD Messages
+message CreateAccountRequest {
+  string user_id = 1;           // From JWT in gateway
+  string currency = 2;          // Required, 3 chars (e.g., "USD", "HKD")
+  string initial_balance = 3;   // Optional, defaults to "0", must be >= 0
+}
+
+message AccountResponse {
+  string account_id = 1;
+  string user_id = 2;
+  string currency = 3;
+  string balance = 4;
+  int64 version = 5;
+}
+
+message ListAccountsRequest {
+  string user_id = 1;    // From JWT in gateway - filter by user
+  int32 page = 2;        // 0-based page number
+  int32 page_size = 3;   // Items per page, default 20
+}
+
+message ListAccountsResponse {
+  repeated AccountResponse accounts = 1;
+  int64 total_count = 2;  // int64 to match Java Page.getTotalElements()
+  int32 page = 3;
+  int32 page_size = 4;
 }
 
 // Domain Events for Kafka/Event-Driven Architecture

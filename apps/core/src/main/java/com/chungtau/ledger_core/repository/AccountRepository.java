@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.jspecify.annotations.NonNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
@@ -26,4 +28,10 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     //Finds all accounts by their associated User ID.
     List<Account> findAllByUserId(String userId);
+
+    //Finds all accounts by User ID with pagination support.
+    Page<Account> findAllByUserId(String userId, Pageable pageable);
+
+    //Finds an account by User ID and Currency (for system equity accounts).
+    Optional<Account> findByUserIdAndCurrency(String userId, String currency);
 }

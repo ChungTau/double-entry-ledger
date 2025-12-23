@@ -277,6 +277,271 @@ func (x *BalanceResponse) GetVersion() int64 {
 	return 0
 }
 
+// Account CRUD Messages
+type CreateAccountRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`                         // From JWT in gateway
+	Currency       string                 `protobuf:"bytes,2,opt,name=currency,proto3" json:"currency,omitempty"`                                   // Required, 3 chars (e.g., "USD", "HKD")
+	InitialBalance string                 `protobuf:"bytes,3,opt,name=initial_balance,json=initialBalance,proto3" json:"initial_balance,omitempty"` // Optional, defaults to "0", must be >= 0
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateAccountRequest) Reset() {
+	*x = CreateAccountRequest{}
+	mi := &file_ledger_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAccountRequest) ProtoMessage() {}
+
+func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAccountRequest.ProtoReflect.Descriptor instead.
+func (*CreateAccountRequest) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CreateAccountRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *CreateAccountRequest) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *CreateAccountRequest) GetInitialBalance() string {
+	if x != nil {
+		return x.InitialBalance
+	}
+	return ""
+}
+
+type AccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Currency      string                 `protobuf:"bytes,3,opt,name=currency,proto3" json:"currency,omitempty"`
+	Balance       string                 `protobuf:"bytes,4,opt,name=balance,proto3" json:"balance,omitempty"`
+	Version       int64                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountResponse) Reset() {
+	*x = AccountResponse{}
+	mi := &file_ledger_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountResponse) ProtoMessage() {}
+
+func (x *AccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountResponse.ProtoReflect.Descriptor instead.
+func (*AccountResponse) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AccountResponse) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AccountResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *AccountResponse) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *AccountResponse) GetBalance() string {
+	if x != nil {
+		return x.Balance
+	}
+	return ""
+}
+
+func (x *AccountResponse) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type ListAccountsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`        // From JWT in gateway - filter by user
+	Page          int32                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`                         // 0-based page number
+	PageSize      int32                  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"` // Items per page, default 20
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountsRequest) Reset() {
+	*x = ListAccountsRequest{}
+	mi := &file_ledger_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountsRequest) ProtoMessage() {}
+
+func (x *ListAccountsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountsRequest.ProtoReflect.Descriptor instead.
+func (*ListAccountsRequest) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListAccountsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ListAccountsRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListAccountsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type ListAccountsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accounts      []*AccountResponse     `protobuf:"bytes,1,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	TotalCount    int64                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"` // int64 to match Java Page.getTotalElements()
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountsResponse) Reset() {
+	*x = ListAccountsResponse{}
+	mi := &file_ledger_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountsResponse) ProtoMessage() {}
+
+func (x *ListAccountsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountsResponse.ProtoReflect.Descriptor instead.
+func (*ListAccountsResponse) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListAccountsResponse) GetAccounts() []*AccountResponse {
+	if x != nil {
+		return x.Accounts
+	}
+	return nil
+}
+
+func (x *ListAccountsResponse) GetTotalCount() int64 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *ListAccountsResponse) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListAccountsResponse) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
 // Domain Events for Kafka/Event-Driven Architecture
 type TransactionCreatedEvent struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -294,7 +559,7 @@ type TransactionCreatedEvent struct {
 
 func (x *TransactionCreatedEvent) Reset() {
 	*x = TransactionCreatedEvent{}
-	mi := &file_ledger_proto_msgTypes[4]
+	mi := &file_ledger_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -306,7 +571,7 @@ func (x *TransactionCreatedEvent) String() string {
 func (*TransactionCreatedEvent) ProtoMessage() {}
 
 func (x *TransactionCreatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_ledger_proto_msgTypes[4]
+	mi := &file_ledger_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -319,7 +584,7 @@ func (x *TransactionCreatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransactionCreatedEvent.ProtoReflect.Descriptor instead.
 func (*TransactionCreatedEvent) Descriptor() ([]byte, []int) {
-	return file_ledger_proto_rawDescGZIP(), []int{4}
+	return file_ledger_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TransactionCreatedEvent) GetTransactionId() string {
@@ -403,7 +668,28 @@ const file_ledger_proto_rawDesc = "" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1a\n" +
 	"\bcurrency\x18\x02 \x01(\tR\bcurrency\x12\x18\n" +
 	"\abalance\x18\x03 \x01(\tR\abalance\x12\x18\n" +
-	"\aversion\x18\x04 \x01(\x03R\aversion\"\x9e\x02\n" +
+	"\aversion\x18\x04 \x01(\x03R\aversion\"t\n" +
+	"\x14CreateAccountRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bcurrency\x18\x02 \x01(\tR\bcurrency\x12'\n" +
+	"\x0finitial_balance\x18\x03 \x01(\tR\x0einitialBalance\"\x99\x01\n" +
+	"\x0fAccountResponse\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bcurrency\x18\x03 \x01(\tR\bcurrency\x12\x18\n" +
+	"\abalance\x18\x04 \x01(\tR\abalance\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\x03R\aversion\"_\n" +
+	"\x13ListAccountsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
+	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"\xad\x01\n" +
+	"\x14ListAccountsResponse\x12C\n" +
+	"\baccounts\x18\x01 \x03(\v2'.com.chungtau.ledger.v1.AccountResponseR\baccounts\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x03R\n" +
+	"totalCount\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\x9e\x02\n" +
 	"\x17TransactionCreatedEvent\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12'\n" +
 	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12&\n" +
@@ -412,11 +698,13 @@ const file_ledger_proto_rawDesc = "" +
 	"\x06amount\x18\x05 \x01(\tR\x06amount\x12\x1a\n" +
 	"\bcurrency\x18\x06 \x01(\tR\bcurrency\x12\x16\n" +
 	"\x06status\x18\a \x01(\tR\x06status\x12\x1b\n" +
-	"\tbooked_at\x18\b \x01(\tR\bbookedAt2\xe5\x01\n" +
+	"\tbooked_at\x18\b \x01(\tR\bbookedAt2\xb8\x03\n" +
 	"\rLedgerService\x12r\n" +
 	"\x11CreateTransaction\x120.com.chungtau.ledger.v1.CreateTransactionRequest\x1a+.com.chungtau.ledger.v1.TransactionResponse\x12`\n" +
 	"\n" +
-	"GetBalance\x12).com.chungtau.ledger.v1.GetBalanceRequest\x1a'.com.chungtau.ledger.v1.BalanceResponseBf\n" +
+	"GetBalance\x12).com.chungtau.ledger.v1.GetBalanceRequest\x1a'.com.chungtau.ledger.v1.BalanceResponse\x12f\n" +
+	"\rCreateAccount\x12,.com.chungtau.ledger.v1.CreateAccountRequest\x1a'.com.chungtau.ledger.v1.AccountResponse\x12i\n" +
+	"\fListAccounts\x12+.com.chungtau.ledger.v1.ListAccountsRequest\x1a,.com.chungtau.ledger.v1.ListAccountsResponseBf\n" +
 	"\x1bcom.chungtau.ledger.grpc.v1B\vLedgerProtoP\x01Z8github.com/chungtau/ledger-gateway/gen/proto/v1;ledgerv1b\x06proto3"
 
 var (
@@ -431,24 +719,33 @@ func file_ledger_proto_rawDescGZIP() []byte {
 	return file_ledger_proto_rawDescData
 }
 
-var file_ledger_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_ledger_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_ledger_proto_goTypes = []any{
 	(*CreateTransactionRequest)(nil), // 0: com.chungtau.ledger.v1.CreateTransactionRequest
 	(*TransactionResponse)(nil),      // 1: com.chungtau.ledger.v1.TransactionResponse
 	(*GetBalanceRequest)(nil),        // 2: com.chungtau.ledger.v1.GetBalanceRequest
 	(*BalanceResponse)(nil),          // 3: com.chungtau.ledger.v1.BalanceResponse
-	(*TransactionCreatedEvent)(nil),  // 4: com.chungtau.ledger.v1.TransactionCreatedEvent
+	(*CreateAccountRequest)(nil),     // 4: com.chungtau.ledger.v1.CreateAccountRequest
+	(*AccountResponse)(nil),          // 5: com.chungtau.ledger.v1.AccountResponse
+	(*ListAccountsRequest)(nil),      // 6: com.chungtau.ledger.v1.ListAccountsRequest
+	(*ListAccountsResponse)(nil),     // 7: com.chungtau.ledger.v1.ListAccountsResponse
+	(*TransactionCreatedEvent)(nil),  // 8: com.chungtau.ledger.v1.TransactionCreatedEvent
 }
 var file_ledger_proto_depIdxs = []int32{
-	0, // 0: com.chungtau.ledger.v1.LedgerService.CreateTransaction:input_type -> com.chungtau.ledger.v1.CreateTransactionRequest
-	2, // 1: com.chungtau.ledger.v1.LedgerService.GetBalance:input_type -> com.chungtau.ledger.v1.GetBalanceRequest
-	1, // 2: com.chungtau.ledger.v1.LedgerService.CreateTransaction:output_type -> com.chungtau.ledger.v1.TransactionResponse
-	3, // 3: com.chungtau.ledger.v1.LedgerService.GetBalance:output_type -> com.chungtau.ledger.v1.BalanceResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	5, // 0: com.chungtau.ledger.v1.ListAccountsResponse.accounts:type_name -> com.chungtau.ledger.v1.AccountResponse
+	0, // 1: com.chungtau.ledger.v1.LedgerService.CreateTransaction:input_type -> com.chungtau.ledger.v1.CreateTransactionRequest
+	2, // 2: com.chungtau.ledger.v1.LedgerService.GetBalance:input_type -> com.chungtau.ledger.v1.GetBalanceRequest
+	4, // 3: com.chungtau.ledger.v1.LedgerService.CreateAccount:input_type -> com.chungtau.ledger.v1.CreateAccountRequest
+	6, // 4: com.chungtau.ledger.v1.LedgerService.ListAccounts:input_type -> com.chungtau.ledger.v1.ListAccountsRequest
+	1, // 5: com.chungtau.ledger.v1.LedgerService.CreateTransaction:output_type -> com.chungtau.ledger.v1.TransactionResponse
+	3, // 6: com.chungtau.ledger.v1.LedgerService.GetBalance:output_type -> com.chungtau.ledger.v1.BalanceResponse
+	5, // 7: com.chungtau.ledger.v1.LedgerService.CreateAccount:output_type -> com.chungtau.ledger.v1.AccountResponse
+	7, // 8: com.chungtau.ledger.v1.LedgerService.ListAccounts:output_type -> com.chungtau.ledger.v1.ListAccountsResponse
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_ledger_proto_init() }
@@ -462,7 +759,7 @@ func file_ledger_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ledger_proto_rawDesc), len(file_ledger_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -15,6 +15,8 @@ import (
 type LedgerClient interface {
 	CreateTransaction(ctx context.Context, req *CreateTransactionRequest) (*TransactionResponse, error)
 	GetBalance(ctx context.Context, accountID string) (*BalanceResponse, error)
+	CreateAccount(ctx context.Context, req *CreateAccountRequest) (*AccountResponse, error)
+	ListAccounts(ctx context.Context, req *ListAccountsRequest) (*ListAccountsResponse, error)
 	Close() error
 }
 
@@ -41,6 +43,37 @@ type BalanceResponse struct {
 	Currency  string
 	Balance   string
 	Version   int64
+}
+
+// CreateAccountRequest represents the request to create an account
+type CreateAccountRequest struct {
+	UserID         string // From JWT - set by handler
+	Currency       string // From request body
+	InitialBalance string // Optional, from request body
+}
+
+// AccountResponse represents the response from account operations
+type AccountResponse struct {
+	AccountID string
+	UserID    string
+	Currency  string
+	Balance   string
+	Version   int64
+}
+
+// ListAccountsRequest represents the request to list accounts
+type ListAccountsRequest struct {
+	UserID   string // From JWT - set by handler
+	Page     int32
+	PageSize int32
+}
+
+// ListAccountsResponse represents the response from listing accounts
+type ListAccountsResponse struct {
+	Accounts   []AccountResponse
+	TotalCount int64 // int64 to match proto definition
+	Page       int32
+	PageSize   int32
 }
 
 // grpcLedgerClient implements LedgerClient using gRPC
@@ -126,6 +159,72 @@ func (c *grpcLedgerClient) GetBalance(ctx context.Context, accountID string) (*B
 		Currency:  resp.Currency,
 		Balance:   resp.Balance,
 		Version:   resp.Version,
+	}, nil
+}
+
+// CreateAccount calls the CreateAccount RPC
+func (c *grpcLedgerClient) CreateAccount(ctx context.Context, req *CreateAccountRequest) (*AccountResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	// Forward request ID to gRPC metadata if present
+	ctx = forwardRequestID(ctx)
+
+	pbReq := &pb.CreateAccountRequest{
+		UserId:         req.UserID,
+		Currency:       req.Currency,
+		InitialBalance: req.InitialBalance,
+	}
+
+	resp, err := c.client.CreateAccount(ctx, pbReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AccountResponse{
+		AccountID: resp.AccountId,
+		UserID:    resp.UserId,
+		Currency:  resp.Currency,
+		Balance:   resp.Balance,
+		Version:   resp.Version,
+	}, nil
+}
+
+// ListAccounts calls the ListAccounts RPC
+func (c *grpcLedgerClient) ListAccounts(ctx context.Context, req *ListAccountsRequest) (*ListAccountsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	// Forward request ID to gRPC metadata if present
+	ctx = forwardRequestID(ctx)
+
+	pbReq := &pb.ListAccountsRequest{
+		UserId:   req.UserID,
+		Page:     req.Page,
+		PageSize: req.PageSize,
+	}
+
+	resp, err := c.client.ListAccounts(ctx, pbReq)
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := make([]AccountResponse, 0, len(resp.Accounts))
+	for _, acc := range resp.Accounts {
+		accounts = append(accounts, AccountResponse{
+			AccountID: acc.AccountId,
+			UserID:    acc.UserId,
+			Currency:  acc.Currency,
+			Balance:   acc.Balance,
+			Version:   acc.Version,
+		})
+	}
+
+	return &ListAccountsResponse{
+		Accounts:   accounts,
+		TotalCount: resp.TotalCount,
+		Page:       resp.Page,
+		PageSize:   resp.PageSize,
 	}, nil
 }
 

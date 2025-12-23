@@ -52,7 +52,10 @@
       "Bash(git config:*)",
       "Bash(test:*)",
       "Bash(git check-attr:*)",
-      "Bash(go mod tidy:*)"
+      "Bash(go mod tidy:*)",
+      "Bash(make proto:*)",
+      "Bash(mvn compile:*)",
+      "Bash(go build:*)"
     ]
   }
 }

@@ -29,6 +29,7 @@ func SetupRouter(cfg *config.Config, ledgerClient grpcclient.LedgerClient, redis
 	healthHandler := handler.NewHealthHandler(ledgerClient, redisClient)
 	transactionHandler := handler.NewTransactionHandler(ledgerClient)
 	balanceHandler := handler.NewBalanceHandler(ledgerClient)
+	accountHandler := handler.NewAccountHandler(ledgerClient)
 	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.DevMode)
 
 	// Health check endpoints (no auth required)
@@ -56,10 +57,9 @@ func SetupRouter(cfg *config.Config, ledgerClient grpcclient.LedgerClient, redis
 		v1.POST("/transactions", transactionHandler.Create)
 
 		// Account endpoints
-		accounts := v1.Group("/accounts")
-		{
-			accounts.GET("/:id/balance", balanceHandler.Get)
-		}
+		v1.POST("/accounts", accountHandler.Create)
+		v1.GET("/accounts", accountHandler.List)
+		v1.GET("/accounts/:id/balance", balanceHandler.Get)
 	}
 
 	return router
